@@ -4,29 +4,38 @@ import { generateContent, generateTitle } from "@/lib/openai";
 import { PLAN_LIMITS } from "@/types";
 
 async function fetchYoutubeTranscript(url: string): Promise<string> {
-  // Supadata works from server IPs; youtube-transcript gets blocked by YouTube on cloud hosts
   const apiKey = process.env.SUPADATA_API_KEY;
-  if (apiKey) {
-    const res = await fetch(
-      `https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(url)}`,
-      { headers: { "x-api-key": apiKey } }
-    );
-    if (res.ok) {
-      const data = await res.json() as { content?: Array<{ text: string }> | string };
-      const text = Array.isArray(data.content)
-        ? data.content.map((c) => c.text).join(" ")
-        : (data.content ?? "");
-      if (text.length > 50) return text;
-    } else {
-      const errText = await res.text().catch(() => "");
-      console.warn(`[transcript] Supadata failed (${res.status}):`, errText);
-    }
+  if (!apiKey) throw new Error("SUPADATA_API_KEY not configured");
+
+  const res = await fetch(
+    `https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(url)}`,
+    { headers: { "x-api-key": apiKey } }
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Supadata ${res.status}: ${body.slice(0, 200)}`);
   }
 
-  // Fallback: works locally but blocked on Vercel cloud IPs
-  const { YoutubeTranscript } = await import("youtube-transcript");
-  const items = await YoutubeTranscript.fetchTranscript(url);
-  return items.map((t) => t.text).join(" ");
+  const data = await res.json() as Record<string, unknown>;
+  console.log(`[transcript] Supadata keys:`, Object.keys(data));
+
+  let text: string;
+  if (Array.isArray(data.content)) {
+    text = (data.content as Array<{ text?: unknown }>)
+      .map((c) => String(c.text ?? ""))
+      .join(" ");
+  } else if (typeof data.content === "string") {
+    text = data.content;
+  } else {
+    throw new Error(`Unexpected Supadata format: ${JSON.stringify(data).slice(0, 200)}`);
+  }
+
+  if (text.trim().length < 50) {
+    throw new Error(`Transcript too short (${text.length} chars)`);
+  }
+
+  return text;
 }
 
 export async function POST(request: NextRequest) {
@@ -108,10 +117,6 @@ async function processJob(
     console.log(`[job:${jobId}] fetching transcript`);
     const transcript = await fetchYoutubeTranscript(url);
     console.log(`[job:${jobId}] transcript fetched — ${transcript.length} chars`);
-
-    if (!transcript || transcript.trim().length < 50) {
-      throw new Error("Transcript too short or unavailable");
-    }
 
     // Check if cancelled while transcribing
     const { data: check } = await supabase
