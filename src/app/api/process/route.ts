@@ -12,12 +12,15 @@ async function fetchYoutubeTranscript(url: string): Promise<string> {
       { headers: { "x-api-key": apiKey } }
     );
     if (res.ok) {
-      const data = await res.json() as { content?: string; transcript?: string };
-      const text = data.content ?? data.transcript ?? "";
+      const data = await res.json() as { content?: Array<{ text: string }> | string };
+      const text = Array.isArray(data.content)
+        ? data.content.map((c) => c.text).join(" ")
+        : (data.content ?? "");
       if (text.length > 50) return text;
+    } else {
+      const errText = await res.text().catch(() => "");
+      console.warn(`[transcript] Supadata failed (${res.status}):`, errText);
     }
-    const errText = await res.text().catch(() => "");
-    console.warn(`[transcript] Supadata failed (${res.status}):`, errText);
   }
 
   // Fallback: works locally but blocked on Vercel cloud IPs
