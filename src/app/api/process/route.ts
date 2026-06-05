@@ -106,9 +106,12 @@ async function processJob(
   userId: string,
   currentMonth: string
 ) {
-  // Use service role client for background work
-  const { createClient: createServerClient } = await import("@/lib/supabase/server");
-  const supabase = await createServerClient();
+  // Service-role client bypasses RLS — needed for writes from after() context
+  const { createClient } = await import("@supabase/supabase-js");
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   try {
     console.log(`[job:${jobId}] starting — url: ${url}`);
