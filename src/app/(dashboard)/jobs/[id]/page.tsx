@@ -183,8 +183,13 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
       {job.status === "failed" && (
         <div className="glass rounded-2xl p-8 border border-red-500/20">
           <p className="text-red-300 font-semibold mb-2">Processing failed</p>
+          {job.error_message && (
+            <p className="text-red-400/70 text-xs font-mono bg-red-500/5 rounded-lg px-3 py-2 mb-3 break-all">
+              {job.error_message}
+            </p>
+          )}
           <p className="text-white/50 text-sm">
-            This can happen if the video doesn&apos;t have captions. Try another video.
+            This can happen if the video doesn&apos;t have captions or is age-restricted. Try another video.
           </p>
           <Link
             href="/new"

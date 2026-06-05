@@ -77,9 +77,13 @@ async function processJob(
   const supabase = await createServerClient();
 
   try {
+    console.log(`[job:${jobId}] starting — url: ${url}`);
+
     // Fetch transcript
+    console.log(`[job:${jobId}] fetching transcript`);
     const transcriptItems = await YoutubeTranscript.fetchTranscript(url);
     const transcript = transcriptItems.map((t) => t.text).join(" ");
+    console.log(`[job:${jobId}] transcript fetched — ${transcriptItems.length} items, ${transcript.length} chars`);
 
     if (!transcript || transcript.trim().length < 50) {
       throw new Error("Transcript too short or unavailable");
@@ -91,7 +95,10 @@ async function processJob(
       .select("status")
       .eq("id", jobId)
       .single();
-    if (check?.status === "cancelled") return;
+    if (check?.status === "cancelled") {
+      console.log(`[job:${jobId}] cancelled before generation`);
+      return;
+    }
 
     // Update status to generating
     await supabase
@@ -101,17 +108,21 @@ async function processJob(
 
     // Generate in two waves to stay within Groq's free-tier TPM limit.
     // Wave 1: title (fast 8B model) + blog + twitter
+    console.log(`[job:${jobId}] wave 1 — title + blog + twitter`);
     const [title, blog, twitter] = await Promise.all([
       generateTitle(transcript),
       generateContent(transcript, "blog"),
       generateContent(transcript, "twitter_thread"),
     ]);
+    console.log(`[job:${jobId}] wave 1 done`);
 
     // Wave 2: linkedin + newsletter
+    console.log(`[job:${jobId}] wave 2 — linkedin + newsletter`);
     const [linkedin, newsletter] = await Promise.all([
       generateContent(transcript, "linkedin"),
       generateContent(transcript, "newsletter"),
     ]);
+    console.log(`[job:${jobId}] wave 2 done`);
 
     // Update job title
     await supabase.from("jobs").update({ title }).eq("id", jobId);
@@ -130,15 +141,14 @@ async function processJob(
       .update({ status: "completed", completed_at: new Date().toISOString() })
       .eq("id", jobId);
 
-    // Increment usage counter
     await supabase.rpc("increment_usage", { p_user_id: userId, p_month: currentMonth });
+    console.log(`[job:${jobId}] completed`);
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error(`[job:${jobId}] FAILED:`, message, err);
     await supabase
       .from("jobs")
-      .update({
-        status: "failed",
-        error_message: err instanceof Error ? err.message : "Unknown error",
-      })
+      .update({ status: "failed", error_message: message })
       .eq("id", jobId);
   }
 }

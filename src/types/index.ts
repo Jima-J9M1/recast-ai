@@ -22,6 +22,7 @@ export interface Job {
   source_url: string | null
   status: JobStatus
   transcript: string | null
+  error_message: string | null
   created_at: string
   completed_at: string | null
   outputs?: Output[]
