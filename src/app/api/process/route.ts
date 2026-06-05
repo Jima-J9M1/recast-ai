@@ -85,6 +85,14 @@ async function processJob(
       throw new Error("Transcript too short or unavailable");
     }
 
+    // Check if cancelled while transcribing
+    const { data: check } = await supabase
+      .from("jobs")
+      .select("status")
+      .eq("id", jobId)
+      .single();
+    if (check?.status === "cancelled") return;
+
     // Update status to generating
     await supabase
       .from("jobs")

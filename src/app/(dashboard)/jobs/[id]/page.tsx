@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2 } from "lucide-react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Job, Output } from "@/types";
@@ -39,6 +39,13 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
   const [outputs, setOutputs] = useState<Output[]>([]);
   const [activeTab, setActiveTab] = useState<Output["type"]>("blog");
   const [loading, setLoading] = useState(true);
+  const [stopping, setStopping] = useState(false);
+
+  async function handleStop() {
+    setStopping(true);
+    await fetch(`/api/jobs/${id}/cancel`, { method: "POST" });
+    setStopping(false);
+  }
 
   useEffect(() => {
     async function load() {
@@ -83,7 +90,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
             .eq("job_id", id);
           setOutputs(outputData ?? []);
           clearInterval(interval);
-        } else if (jobData.status === "failed") {
+        } else if (jobData.status === "failed" || jobData.status === "cancelled") {
           clearInterval(interval);
         }
       }
@@ -130,6 +137,8 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
               ? "bg-green-500/10 text-green-400"
               : job.status === "failed"
               ? "bg-red-500/10 text-red-400"
+              : job.status === "cancelled"
+              ? "bg-white/10 text-white/40"
               : "bg-yellow-500/10 text-yellow-400"
           }`}
         >
@@ -145,6 +154,28 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
             {job.status === "transcribing" ? "Fetching transcript..." : "Generating content..."}
           </p>
           <p className="text-white/40 text-sm mt-2">This usually takes 15-30 seconds</p>
+          <button
+            onClick={handleStop}
+            disabled={stopping}
+            className="mt-6 flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 text-white/50 hover:text-red-400 text-sm transition-all mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Square className="w-3.5 h-3.5" />
+            {stopping ? "Stopping..." : "Stop job"}
+          </button>
+        </div>
+      )}
+
+      {/* Cancelled state */}
+      {job.status === "cancelled" && (
+        <div className="glass rounded-2xl p-8 border border-white/10">
+          <p className="text-white/60 font-semibold mb-2">Job cancelled</p>
+          <p className="text-white/30 text-sm">The processing was stopped before it completed.</p>
+          <Link
+            href="/new"
+            className="inline-block mt-4 px-4 py-2 rounded-xl bg-white/10 text-white text-sm hover:bg-white/20 transition-colors"
+          >
+            Start a new job
+          </Link>
         </div>
       )}
 
