@@ -71,16 +71,26 @@ Transcript:
 Write the full newsletter in Markdown format, starting with "Subject: " and "Preview: " lines.`,
 }
 
+const MAX_TOKENS: Record<ContentFormat, number> = {
+  blog: 1200,
+  twitter_thread: 600,
+  linkedin: 400,
+  newsletter: 900,
+}
+
+// Groq free tier: ~6k TPM. Keep transcript short so 4 parallel calls don't burst the limit.
+const TRANSCRIPT_LIMIT = 4000
+
 export async function generateContent(
   transcript: string,
   format: ContentFormat
 ): Promise<string> {
-  const prompt = PROMPTS[format].replace('{transcript}', transcript.slice(0, 12000))
+  const prompt = PROMPTS[format].replace('{transcript}', transcript.slice(0, TRANSCRIPT_LIMIT))
 
   const response = await openai.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [{ role: 'user', content: prompt }],
-    max_tokens: 2000,
+    max_tokens: MAX_TOKENS[format],
     temperature: 0.7,
   })
 
@@ -89,7 +99,8 @@ export async function generateContent(
 
 export async function generateTitle(transcript: string): Promise<string> {
   const response = await openai.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
+    // Use the fast 8B model for the title — quality doesn't need 70B
+    model: 'llama-3.1-8b-instant',
     messages: [
       {
         role: 'user',

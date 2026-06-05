@@ -93,11 +93,16 @@ async function processJob(
       .update({ status: "generating", transcript })
       .eq("id", jobId);
 
-    // Generate title + all 4 content formats in parallel
-    const [title, blog, twitter, linkedin, newsletter] = await Promise.all([
+    // Generate in two waves to stay within Groq's free-tier TPM limit.
+    // Wave 1: title (fast 8B model) + blog + twitter
+    const [title, blog, twitter] = await Promise.all([
       generateTitle(transcript),
       generateContent(transcript, "blog"),
       generateContent(transcript, "twitter_thread"),
+    ]);
+
+    // Wave 2: linkedin + newsletter
+    const [linkedin, newsletter] = await Promise.all([
       generateContent(transcript, "linkedin"),
       generateContent(transcript, "newsletter"),
     ]);
