@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { YoutubeTranscript } from "youtube-transcript";
 import { createClient } from "@/lib/supabase/server";
 import { generateContent, generateTitle } from "@/lib/openai";
@@ -60,10 +60,8 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Failed to create job" }, { status: 500 });
   }
 
-  // Process asynchronously (fire and forget)
-  processJob(job.id, url, user.id, currentMonth).catch(() => {
-    // Failure handled inside processJob
-  });
+  // after() keeps the serverless function alive past the response on Vercel
+  after(() => processJob(job.id, url, user.id, currentMonth));
 
   return Response.json({ jobId: job.id });
 }
