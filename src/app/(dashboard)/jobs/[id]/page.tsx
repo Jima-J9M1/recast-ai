@@ -1,15 +1,15 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { FileText, Twitter, Linkedin, Mail, Copy, Check, ArrowLeft, Loader2 } from "lucide-react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Job, Output } from "@/types";
 
 const OUTPUT_TABS = [
   { type: "blog" as const, icon: FileText, label: "Blog Post" },
-  { type: "twitter_thread" as const, icon: Twitter, label: "Twitter Thread" },
-  { type: "linkedin" as const, icon: Linkedin, label: "LinkedIn" },
+  { type: "twitter_thread" as const, icon: Hash, label: "Twitter Thread" },
+  { type: "linkedin" as const, icon: Briefcase, label: "LinkedIn" },
   { type: "newsletter" as const, icon: Mail, label: "Newsletter" },
 ];
 

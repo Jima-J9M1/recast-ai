@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Zap, FileText, Twitter, Linkedin, Mail, ArrowRight, Check, Star } from "lucide-react";
+import { Zap, FileText, Hash, Briefcase, Mail, ArrowRight, Check, Star } from "lucide-react";
 
 const features = [
   {
@@ -8,12 +8,12 @@ const features = [
     description: "SEO-optimized long-form article with proper structure and headings.",
   },
   {
-    icon: Twitter,
+    icon: Hash,
     title: "Twitter Thread",
     description: "Viral-ready thread with hook, insights, and strong CTA.",
   },
   {
-    icon: Linkedin,
+    icon: Briefcase,
     title: "LinkedIn Post",
     description: "Professional post crafted for engagement and reach.",
   },

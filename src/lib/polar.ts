@@ -16,7 +16,7 @@ export async function createCheckoutUrl(
   successUrl: string
 ): Promise<string> {
   const checkout = await polar.checkouts.create({
-    productId,
+    products: [productId],
     customerEmail: userEmail,
     metadata: { userId },
     successUrl,

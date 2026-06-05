@@ -1,7 +1,9 @@
 import OpenAI from 'openai'
 
+// Uses Groq-compatible OpenAI SDK — just swap base URL
 export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
+  baseURL: 'https://api.groq.com/openai/v1',
 })
 
 export type ContentFormat = 'blog' | 'twitter_thread' | 'linkedin' | 'newsletter'
@@ -76,7 +78,7 @@ export async function generateContent(
   const prompt = PROMPTS[format].replace('{transcript}', transcript.slice(0, 12000))
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'llama-3.3-70b-versatile',
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 2000,
     temperature: 0.7,
@@ -87,7 +89,7 @@ export async function generateContent(
 
 export async function generateTitle(transcript: string): Promise<string> {
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'llama-3.3-70b-versatile',
     messages: [
       {
         role: 'user',

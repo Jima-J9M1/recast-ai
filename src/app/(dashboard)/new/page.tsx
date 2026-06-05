@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Youtube, Loader2, Zap } from "lucide-react";
+import { Film, Loader2, Zap } from "lucide-react";
 
 function isYouTubeUrl(url: string) {
   return /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/.test(url);
@@ -61,7 +61,7 @@ export default function NewPage() {
           <div>
             <label className="block text-sm text-white/70 mb-3">YouTube URL</label>
             <div className="relative">
-              <Youtube className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-red-400" />
+              <Film className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-red-400" />
               <input
                 type="url"
                 value={url}
