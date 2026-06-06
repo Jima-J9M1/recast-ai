@@ -142,20 +142,29 @@ async function processJob(
       .update({ status: "generating", transcript })
       .eq("id", jobId);
 
+    // Fetch user's custom prompt templates (Pro feature)
+    const { data: templates } = await supabase
+      .from("prompt_templates")
+      .select("format, prompt")
+      .eq("user_id", userId);
+    const customPrompts = Object.fromEntries(
+      (templates ?? []).map((t: { format: string; prompt: string }) => [t.format, t.prompt])
+    ) as Partial<Record<string, string>>;
+
     // Wave 1: title + blog + twitter
     console.log(`[job:${jobId}] wave 1 — title + blog + twitter`);
     const [title, blog, twitter] = await Promise.all([
       generateTitle(transcript),
-      generateContent(transcript, "blog", tone),
-      generateContent(transcript, "twitter_thread", tone),
+      generateContent(transcript, "blog", tone, customPrompts["blog"]),
+      generateContent(transcript, "twitter_thread", tone, customPrompts["twitter_thread"]),
     ]);
     console.log(`[job:${jobId}] wave 1 done`);
 
     // Wave 2: linkedin + newsletter
     console.log(`[job:${jobId}] wave 2 — linkedin + newsletter`);
     const [linkedin, newsletter] = await Promise.all([
-      generateContent(transcript, "linkedin", tone),
-      generateContent(transcript, "newsletter", tone),
+      generateContent(transcript, "linkedin", tone, customPrompts["linkedin"]),
+      generateContent(transcript, "newsletter", tone, customPrompts["newsletter"]),
     ]);
     console.log(`[job:${jobId}] wave 2 done`);
 
