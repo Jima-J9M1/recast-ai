@@ -22,7 +22,7 @@ const TONE_INSTRUCTIONS: Record<ToneStyle, string> = {
     'Inject wit and light humor throughout — clever observations, playful language, and a fun voice. Informative but never dry.',
 }
 
-const PROMPTS: Record<ContentFormat, string> = {
+export const DEFAULT_PROMPTS: Record<ContentFormat, string> = {
   blog: `You are an expert content writer. Transform the following transcript into an engaging, SEO-optimized blog post.
 
 Tone: {tone}
@@ -105,9 +105,11 @@ const TRANSCRIPT_LIMIT = 4000
 export async function generateContent(
   transcript: string,
   format: ContentFormat,
-  tone: ToneStyle = 'professional'
+  tone: ToneStyle = 'professional',
+  customPrompt?: string
 ): Promise<string> {
-  const prompt = PROMPTS[format]
+  const base = customPrompt ?? DEFAULT_PROMPTS[format]
+  const prompt = base
     .replace('{tone}', TONE_INSTRUCTIONS[tone])
     .replace('{transcript}', transcript.slice(0, TRANSCRIPT_LIMIT))
 

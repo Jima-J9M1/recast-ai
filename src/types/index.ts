@@ -39,6 +39,14 @@ export interface Output {
   created_at: string
 }
 
+export interface PromptTemplate {
+  id: string
+  user_id: string
+  format: OutputType
+  prompt: string
+  updated_at: string
+}
+
 export interface Usage {
   id: string
   user_id: string
