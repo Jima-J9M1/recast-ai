@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Zap, LayoutDashboard, PlusCircle, History, LogOut, TrendingUp, SlidersHorizontal } from "lucide-react";
+import { Zap, LayoutDashboard, PlusCircle, History, LogOut, TrendingUp, SlidersHorizontal, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/new", icon: PlusCircle, label: "New Content" },
   { href: "/history", icon: History, label: "History" },
   { href: "/prompts", icon: SlidersHorizontal, label: "Custom Prompts" },
+  { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
 interface Profile {
