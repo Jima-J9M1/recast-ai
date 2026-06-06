@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Zap, FileText, Hash, Briefcase, Mail, ArrowRight } from "lucide-react";
-import type { ToneStyle } from "@/types";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { PLAN_LIMITS, type ToneStyle, type Plan } from "@/types";
 
 const OUTPUT_TYPES = [
   { icon: FileText, label: "Blog Post", desc: "SEO-optimized long-form article" },
@@ -30,6 +32,26 @@ export default function NewPage() {
   const [tone, setTone] = useState<ToneStyle>("professional");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [creditsLeft, setCreditsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function loadCredits() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const [{ data: profile }, { data: usage }] = await Promise.all([
+        supabase.from("users").select("plan").eq("id", user.id).single(),
+        supabase.from("usage").select("count").eq("user_id", user.id).eq("month", currentMonth).single(),
+      ]);
+      const plan = (profile?.plan ?? "free") as Plan;
+      const limit = PLAN_LIMITS[plan];
+      if (limit !== null) {
+        setCreditsLeft(Math.max(0, limit - (usage?.count ?? 0)));
+      }
+    }
+    void loadCredits();
+  }, []);
 
   async function handleSubmit() {
     if (!isYouTubeUrl(url)) { setError("Please enter a valid YouTube URL."); return; }
@@ -58,6 +80,22 @@ export default function NewPage() {
         <h1 className="text-2xl font-bold text-white">New content</h1>
         <p className="text-white/40 mt-1">Paste a YouTube URL — we&apos;ll generate 4 content formats in ~30s.</p>
       </div>
+
+      {/* 1 credit remaining warning */}
+      {creditsLeft === 1 && (
+        <div className="mb-5 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+            <p className="text-amber-300 text-sm truncate">This will use your last free video this month.</p>
+          </div>
+          <Link
+            href="/upgrade"
+            className="shrink-0 text-xs text-amber-300 font-semibold hover:text-amber-200 transition-colors"
+          >
+            Upgrade →
+          </Link>
+        </div>
+      )}
 
       <div className="glass rounded-2xl p-7 mb-6 space-y-6">
         <form onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}>
