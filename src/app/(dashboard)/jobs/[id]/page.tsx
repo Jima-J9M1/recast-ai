@@ -17,6 +17,14 @@ const TABS = [
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
+const TONE_LABELS: Record<string, string> = {
+  professional: "💼 Professional",
+  casual: "☕ Casual",
+  storytelling: "📖 Storytelling",
+  educational: "🎓 Educational",
+  humorous: "😄 Humorous",
+};
+
 function getTabClass(active: boolean, has: boolean): string {
   if (active) return "bg-violet-600 text-white shadow-lg shadow-violet-900/40";
   if (has) return "text-white/50 hover:text-white hover:bg-white/5";
@@ -143,9 +151,16 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
             </a>
           )}
         </div>
-        <span className={`text-xs px-2.5 py-1 rounded-full shrink-0 ${getStatusBadge(job.status)}`}>
-          {job.status}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          {job.tone && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-white/40 border border-white/8">
+              {TONE_LABELS[job.tone] ?? job.tone}
+            </span>
+          )}
+          <span className={`text-xs px-2.5 py-1 rounded-full ${getStatusBadge(job.status)}`}>
+            {job.status}
+          </span>
+        </div>
       </div>
 
       {/* Processing */}

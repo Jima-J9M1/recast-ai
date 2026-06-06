@@ -1,11 +1,15 @@
 import { NextRequest, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateContent, generateTitle } from "@/lib/openai";
-import { PLAN_LIMITS } from "@/types";
+import { PLAN_LIMITS, type ToneStyle } from "@/types";
+
+const VALID_TONES = new Set<ToneStyle>([
+  "professional", "casual", "storytelling", "educational", "humorous",
+]);
 
 async function fetchYoutubeTranscript(url: string): Promise<string> {
   const apiKey = process.env.SUPADATA_API_KEY;
-  if (!apiKey) throw new Error("SUPADATA_API_KEY not configured");
+  if (!apiKey) throw new TypeError("SUPADATA_API_KEY not configured");
 
   const res = await fetch(
     `https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(url)}`,
@@ -22,13 +26,13 @@ async function fetchYoutubeTranscript(url: string): Promise<string> {
 
   let text: string;
   if (Array.isArray(data.content)) {
-    text = (data.content as Array<{ text?: unknown }>)
-      .map((c) => String(c.text ?? ""))
+    text = (data.content as Array<{ text?: string }>)
+      .map((c) => c.text ?? "")
       .join(" ");
   } else if (typeof data.content === "string") {
     text = data.content;
   } else {
-    throw new Error(`Unexpected Supadata format: ${JSON.stringify(data).slice(0, 200)}`);
+    throw new TypeError(`Unexpected Supadata format: ${JSON.stringify(data).slice(0, 200)}`);
   }
 
   if (text.trim().length < 50) {
@@ -41,20 +45,22 @@ async function fetchYoutubeTranscript(url: string): Promise<string> {
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
-  // Auth check
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { url } = body as { url: string };
+  const body = await request.json() as { url?: string; tone?: string };
+  const { url } = body;
 
   if (!url || typeof url !== "string") {
     return Response.json({ error: "Missing URL" }, { status: 400 });
   }
 
-  // Load user profile & check usage limit
+  const tone: ToneStyle = VALID_TONES.has(body.tone as ToneStyle)
+    ? (body.tone as ToneStyle)
+    : "professional";
+
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   const [{ data: profile }, { data: usage }] = await Promise.all([
@@ -78,7 +84,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Create job record
   const { data: job, error: jobError } = await supabase
     .from("jobs")
     .insert({
@@ -86,6 +91,7 @@ export async function POST(request: NextRequest) {
       source_type: "youtube",
       source_url: url,
       status: "transcribing",
+      tone,
     })
     .select("id")
     .single();
@@ -95,7 +101,7 @@ export async function POST(request: NextRequest) {
   }
 
   // after() keeps the serverless function alive past the response on Vercel
-  after(() => processJob(job.id, url, user.id, currentMonth));
+  after(() => processJob(job.id, url, tone, user.id, currentMonth));
 
   return Response.json({ jobId: job.id });
 }
@@ -103,6 +109,7 @@ export async function POST(request: NextRequest) {
 async function processJob(
   jobId: string,
   url: string,
+  tone: ToneStyle,
   userId: string,
   currentMonth: string
 ) {
@@ -114,14 +121,12 @@ async function processJob(
   );
 
   try {
-    console.log(`[job:${jobId}] starting — url: ${url}`);
+    console.log(`[job:${jobId}] starting — url: ${url} tone: ${tone}`);
 
-    // Fetch transcript
     console.log(`[job:${jobId}] fetching transcript`);
     const transcript = await fetchYoutubeTranscript(url);
     console.log(`[job:${jobId}] transcript fetched — ${transcript.length} chars`);
 
-    // Check if cancelled while transcribing
     const { data: check } = await supabase
       .from("jobs")
       .select("status")
@@ -132,34 +137,30 @@ async function processJob(
       return;
     }
 
-    // Update status to generating
     await supabase
       .from("jobs")
       .update({ status: "generating", transcript })
       .eq("id", jobId);
 
-    // Generate in two waves to stay within Groq's free-tier TPM limit.
-    // Wave 1: title (fast 8B model) + blog + twitter
+    // Wave 1: title + blog + twitter
     console.log(`[job:${jobId}] wave 1 — title + blog + twitter`);
     const [title, blog, twitter] = await Promise.all([
       generateTitle(transcript),
-      generateContent(transcript, "blog"),
-      generateContent(transcript, "twitter_thread"),
+      generateContent(transcript, "blog", tone),
+      generateContent(transcript, "twitter_thread", tone),
     ]);
     console.log(`[job:${jobId}] wave 1 done`);
 
     // Wave 2: linkedin + newsletter
     console.log(`[job:${jobId}] wave 2 — linkedin + newsletter`);
     const [linkedin, newsletter] = await Promise.all([
-      generateContent(transcript, "linkedin"),
-      generateContent(transcript, "newsletter"),
+      generateContent(transcript, "linkedin", tone),
+      generateContent(transcript, "newsletter", tone),
     ]);
     console.log(`[job:${jobId}] wave 2 done`);
 
-    // Update job title
     await supabase.from("jobs").update({ title }).eq("id", jobId);
 
-    // Save outputs
     await supabase.from("outputs").insert([
       { job_id: jobId, type: "blog", content: blog },
       { job_id: jobId, type: "twitter_thread", content: twitter },
@@ -167,7 +168,6 @@ async function processJob(
       { job_id: jobId, type: "newsletter", content: newsletter },
     ]);
 
-    // Mark completed
     await supabase
       .from("jobs")
       .update({ status: "completed", completed_at: new Date().toISOString() })
