@@ -53,6 +53,45 @@ function CopyButton({ text }: Readonly<{ text: string }>) {
   );
 }
 
+function parseTweets(content: string): string[] {
+  // Try splitting on blank lines — each tweet block starts with "N/"
+  const blocks = content.split(/\n\n+/).map((b) => b.trim()).filter(Boolean);
+  const numbered = blocks.filter((b) => /^\d+\//.test(b));
+  if (numbered.length >= 2) return numbered;
+  // Fallback: split inline on the numbering pattern
+  return content.split(/(?=\n\d+\/)/).map((t) => t.trim()).filter(Boolean);
+}
+
+function TwitterThreadView({ content }: Readonly<{ content: string }>) {
+  const tweets = parseTweets(content);
+  if (tweets.length < 2) {
+    return (
+      <pre className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed font-sans">
+        {content}
+      </pre>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {tweets.map((tweet, i) => {
+        const charCount = tweet.length;
+        const over = charCount > 280;
+        return (
+          <div key={i} className="rounded-xl bg-white/2.5 border border-white/6 p-4">
+            <p className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed">{tweet}</p>
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+              <span className={`text-xs tabular-nums ${over ? "text-red-400" : "text-white/25"}`}>
+                {charCount} / 280{over ? " · over limit" : ""}
+              </span>
+              <CopyButton text={tweet} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function DownloadButton({ text, filename }: Readonly<{ text: string; filename: string }>) {
   function download() {
     const blob = new Blob([text], { type: "text/markdown" });
@@ -254,9 +293,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
               </div>
               <div className="p-7 overflow-auto max-h-[65vh]">
                 {activeTab === "twitter_thread" ? (
-                  <pre className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed font-sans">
-                    {activeOutput.content}
-                  </pre>
+                  <TwitterThreadView content={activeOutput.content} />
                 ) : (
                   <div className="prose-dark">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
