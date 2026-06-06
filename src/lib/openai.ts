@@ -106,12 +106,16 @@ export async function generateContent(
   transcript: string,
   format: ContentFormat,
   tone: ToneStyle = 'professional',
-  customPrompt?: string
+  customPrompt?: string,
+  language = 'English'
 ): Promise<string> {
   const base = customPrompt ?? DEFAULT_PROMPTS[format]
+  const languageInstruction = language === 'English'
+    ? ''
+    : `\n\nIMPORTANT: Write the entire output in ${language}. Do not use English anywhere in the response.`
   const prompt = base
     .replace('{tone}', TONE_INSTRUCTIONS[tone])
-    .replace('{transcript}', transcript.slice(0, TRANSCRIPT_LIMIT))
+    .replace('{transcript}', transcript.slice(0, TRANSCRIPT_LIMIT)) + languageInstruction
 
   const response = await openai.chat.completions.create({
     model: 'llama-3.3-70b-versatile',

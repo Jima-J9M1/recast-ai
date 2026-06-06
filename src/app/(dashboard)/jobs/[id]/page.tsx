@@ -73,11 +73,11 @@ function TwitterThreadView({ content }: Readonly<{ content: string }>) {
   }
   return (
     <div className="space-y-3">
-      {tweets.map((tweet, i) => {
+      {tweets.map((tweet) => {
         const charCount = tweet.length;
         const over = charCount > 280;
         return (
-          <div key={i} className="rounded-xl bg-white/2.5 border border-white/6 p-4">
+          <div key={tweet.slice(0, 40)} className="rounded-xl bg-white/2.5 border border-white/6 p-4">
             <p className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed">{tweet}</p>
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
               <span className={`text-xs tabular-nums ${over ? "text-red-400" : "text-white/25"}`}>
@@ -194,6 +194,11 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
           {job.tone && (
             <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-white/40 border border-white/8">
               {TONE_LABELS[job.tone] ?? job.tone}
+            </span>
+          )}
+          {job.language && job.language !== "English" && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-white/40 border border-white/8">
+              🌐 {job.language}
             </span>
           )}
           <span className={`text-xs px-2.5 py-1 rounded-full ${getStatusBadge(job.status)}`}>

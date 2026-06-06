@@ -6,6 +6,23 @@ export type OutputType = 'blog' | 'twitter_thread' | 'linkedin' | 'newsletter'
 
 export type ToneStyle = 'professional' | 'casual' | 'storytelling' | 'educational' | 'humorous'
 
+export const LANGUAGES = [
+  { code: 'English',    flag: '🇬🇧' },
+  { code: 'Spanish',    flag: '🇪🇸' },
+  { code: 'French',     flag: '🇫🇷' },
+  { code: 'Portuguese', flag: '🇧🇷' },
+  { code: 'German',     flag: '🇩🇪' },
+  { code: 'Italian',    flag: '🇮🇹' },
+  { code: 'Dutch',      flag: '🇳🇱' },
+  { code: 'Japanese',   flag: '🇯🇵' },
+  { code: 'Chinese',    flag: '🇨🇳' },
+  { code: 'Arabic',     flag: '🇸🇦' },
+  { code: 'Hindi',      flag: '🇮🇳' },
+  { code: 'Korean',     flag: '🇰🇷' },
+] as const
+
+export type Language = typeof LANGUAGES[number]['code']
+
 export interface User {
   id: string
   email: string
@@ -24,6 +41,7 @@ export interface Job {
   source_url: string | null
   status: JobStatus
   tone: ToneStyle
+  language: string
   transcript: string | null
   error_message: string | null
   created_at: string
