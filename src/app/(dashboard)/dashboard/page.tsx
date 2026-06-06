@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { PlusCircle, Zap, FileText, Clock, TrendingUp, ArrowRight, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PLAN_LIMITS } from "@/types";
+import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 
 function getGreeting(hour: number): string {
   if (hour < 12) return "Good morning";
@@ -73,6 +74,9 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
+      {/* Onboarding checklist — only for new free users */}
+      <OnboardingChecklist completedJobs={completedJobs} plan={plan} />
+
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="glass rounded-2xl p-5">
@@ -102,6 +106,29 @@ export default async function DashboardPage() {
           <p className="text-xs text-white/30 mt-1">of {totalJobs} jobs</p>
         </div>
       </div>
+
+      {/* 1 credit remaining — high-urgency banner */}
+      {remaining === 1 && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
+              <Zap className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-amber-300 text-sm font-semibold">1 video left this month</p>
+              <p className="text-amber-300/60 text-xs mt-0.5 truncate">
+                Upgrade to Starter — 10 videos/month for $19
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/upgrade"
+            className="shrink-0 px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-sm font-semibold transition-all"
+          >
+            Upgrade →
+          </Link>
+        </div>
+      )}
 
       {/* Usage bar */}
       {limit !== null && (

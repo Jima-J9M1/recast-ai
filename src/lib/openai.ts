@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import type { ToneStyle } from '@/types'
 
 // Uses Groq-compatible OpenAI SDK — just swap base URL
 export const openai = new OpenAI({
@@ -8,15 +9,29 @@ export const openai = new OpenAI({
 
 export type ContentFormat = 'blog' | 'twitter_thread' | 'linkedin' | 'newsletter'
 
-const PROMPTS: Record<ContentFormat, string> = {
+const TONE_INSTRUCTIONS: Record<ToneStyle, string> = {
+  professional:
+    'Maintain a professional, authoritative, and polished tone. Write as a credible industry expert.',
+  casual:
+    'Write in a friendly, conversational tone — like talking to a smart friend. Avoid jargon. Keep it light and approachable.',
+  storytelling:
+    'Lead with narrative. Use anecdotes, personal angles, and vivid examples. Make the reader feel something before you inform them.',
+  educational:
+    'Write as a teacher or mentor. Break concepts down clearly with analogies, numbered steps, and accessible explanations.',
+  humorous:
+    'Inject wit and light humor throughout — clever observations, playful language, and a fun voice. Informative but never dry.',
+}
+
+export const DEFAULT_PROMPTS: Record<ContentFormat, string> = {
   blog: `You are an expert content writer. Transform the following transcript into an engaging, SEO-optimized blog post.
+
+Tone: {tone}
 
 Structure:
 - Compelling H1 title
 - Introduction (hook the reader)
 - 3-5 main sections with H2 headings
 - Key takeaways or conclusion
-- Conversational but authoritative tone
 
 Transcript:
 {transcript}
@@ -24,6 +39,8 @@ Transcript:
 Write the full blog post in Markdown format.`,
 
   twitter_thread: `You are a viral Twitter/X content creator. Transform the following transcript into a compelling Twitter thread.
+
+Tone: {tone}
 
 Rules:
 - First tweet is the hook (must grab attention immediately)
@@ -40,6 +57,8 @@ Write the full Twitter thread.`,
 
   linkedin: `You are a LinkedIn thought leader. Transform the following transcript into a high-performing LinkedIn post.
 
+Tone: {tone}
+
 Structure:
 - Strong opening line (no "I'm excited to share...")
 - Share 3-5 key insights as short paragraphs
@@ -54,6 +73,8 @@ Transcript:
 Write the LinkedIn post.`,
 
   newsletter: `You are an expert newsletter writer. Transform the following transcript into an engaging email newsletter.
+
+Tone: {tone}
 
 Structure:
 - Subject line (compelling, max 50 chars)
@@ -78,14 +99,19 @@ const MAX_TOKENS: Record<ContentFormat, number> = {
   newsletter: 900,
 }
 
-// Groq free tier: ~6k TPM. Keep transcript short so 4 parallel calls don't burst the limit.
+// Groq free tier: ~6k TPM. Keep transcript short so parallel calls don't burst the limit.
 const TRANSCRIPT_LIMIT = 4000
 
 export async function generateContent(
   transcript: string,
-  format: ContentFormat
+  format: ContentFormat,
+  tone: ToneStyle = 'professional',
+  customPrompt?: string
 ): Promise<string> {
-  const prompt = PROMPTS[format].replace('{transcript}', transcript.slice(0, TRANSCRIPT_LIMIT))
+  const base = customPrompt ?? DEFAULT_PROMPTS[format]
+  const prompt = base
+    .replace('{tone}', TONE_INSTRUCTIONS[tone])
+    .replace('{transcript}', transcript.slice(0, TRANSCRIPT_LIMIT))
 
   const response = await openai.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
@@ -99,7 +125,6 @@ export async function generateContent(
 
 export async function generateTitle(transcript: string): Promise<string> {
   const response = await openai.chat.completions.create({
-    // Use the fast 8B model for the title — quality doesn't need 70B
     model: 'llama-3.1-8b-instant',
     messages: [
       {

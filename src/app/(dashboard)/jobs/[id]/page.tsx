@@ -17,6 +17,14 @@ const TABS = [
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
+const TONE_LABELS: Record<string, string> = {
+  professional: "💼 Professional",
+  casual: "☕ Casual",
+  storytelling: "📖 Storytelling",
+  educational: "🎓 Educational",
+  humorous: "😄 Humorous",
+};
+
 function getTabClass(active: boolean, has: boolean): string {
   if (active) return "bg-violet-600 text-white shadow-lg shadow-violet-900/40";
   if (has) return "text-white/50 hover:text-white hover:bg-white/5";
@@ -42,6 +50,45 @@ function CopyButton({ text }: Readonly<{ text: string }>) {
       {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
       {copied ? "Copied!" : "Copy"}
     </button>
+  );
+}
+
+function parseTweets(content: string): string[] {
+  // Try splitting on blank lines — each tweet block starts with "N/"
+  const blocks = content.split(/\n\n+/).map((b) => b.trim()).filter(Boolean);
+  const numbered = blocks.filter((b) => /^\d+\//.test(b));
+  if (numbered.length >= 2) return numbered;
+  // Fallback: split inline on the numbering pattern
+  return content.split(/(?=\n\d+\/)/).map((t) => t.trim()).filter(Boolean);
+}
+
+function TwitterThreadView({ content }: Readonly<{ content: string }>) {
+  const tweets = parseTweets(content);
+  if (tweets.length < 2) {
+    return (
+      <pre className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed font-sans">
+        {content}
+      </pre>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {tweets.map((tweet, i) => {
+        const charCount = tweet.length;
+        const over = charCount > 280;
+        return (
+          <div key={i} className="rounded-xl bg-white/2.5 border border-white/6 p-4">
+            <p className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed">{tweet}</p>
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+              <span className={`text-xs tabular-nums ${over ? "text-red-400" : "text-white/25"}`}>
+                {charCount} / 280{over ? " · over limit" : ""}
+              </span>
+              <CopyButton text={tweet} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -143,9 +190,16 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
             </a>
           )}
         </div>
-        <span className={`text-xs px-2.5 py-1 rounded-full shrink-0 ${getStatusBadge(job.status)}`}>
-          {job.status}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          {job.tone && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-white/40 border border-white/8">
+              {TONE_LABELS[job.tone] ?? job.tone}
+            </span>
+          )}
+          <span className={`text-xs px-2.5 py-1 rounded-full ${getStatusBadge(job.status)}`}>
+            {job.status}
+          </span>
+        </div>
       </div>
 
       {/* Processing */}
@@ -239,9 +293,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
               </div>
               <div className="p-7 overflow-auto max-h-[65vh]">
                 {activeTab === "twitter_thread" ? (
-                  <pre className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed font-sans">
-                    {activeOutput.content}
-                  </pre>
+                  <TwitterThreadView content={activeOutput.content} />
                 ) : (
                   <div className="prose-dark">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>

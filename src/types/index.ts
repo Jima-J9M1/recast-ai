@@ -4,6 +4,8 @@ export type JobStatus = 'pending' | 'transcribing' | 'generating' | 'completed' 
 
 export type OutputType = 'blog' | 'twitter_thread' | 'linkedin' | 'newsletter'
 
+export type ToneStyle = 'professional' | 'casual' | 'storytelling' | 'educational' | 'humorous'
+
 export interface User {
   id: string
   email: string
@@ -21,6 +23,7 @@ export interface Job {
   source_type: 'youtube' | 'upload'
   source_url: string | null
   status: JobStatus
+  tone: ToneStyle
   transcript: string | null
   error_message: string | null
   created_at: string
@@ -34,6 +37,14 @@ export interface Output {
   type: OutputType
   content: string
   created_at: string
+}
+
+export interface PromptTemplate {
+  id: string
+  user_id: string
+  format: OutputType
+  prompt: string
+  updated_at: string
 }
 
 export interface Usage {
