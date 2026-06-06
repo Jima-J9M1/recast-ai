@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState, useCallback } from "react";
-import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download } from "lucide-react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -114,6 +114,30 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   const [activeTab, setActiveTab] = useState<Output["type"]>("blog");
   const [loading, setLoading] = useState(true);
   const [stopping, setStopping] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [refineOpen, setRefineOpen] = useState(false);
+  const [refineInstruction, setRefineInstruction] = useState("");
+
+  const handleRegenerate = useCallback(async (instruction?: string) => {
+    setRegenerating(true);
+    setRefineOpen(false);
+    try {
+      const res = await fetch(`/api/jobs/${id}/regenerate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format: activeTab, instruction }),
+      });
+      if (res.ok) {
+        const { content } = await res.json() as { content: string };
+        setOutputs((prev) =>
+          prev.map((o) => (o.type === activeTab ? { ...o, content } : o))
+        );
+        setRefineInstruction("");
+      }
+    } finally {
+      setRegenerating(false);
+    }
+  }, [id, activeTab]);
 
   const loadOutputs = useCallback(async (jobId: string) => {
     const supabase = createClient();
@@ -196,10 +220,12 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
               {TONE_LABELS[job.tone] ?? job.tone}
             </span>
           )}
-          {job.language && job.language !== "English" && (
-            <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-white/40 border border-white/8">
-              🌐 {job.language}
-            </span>
+          {job.language && job.language === "English" ? null : (
+            job.language && (
+              <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-white/40 border border-white/8">
+                🌐 {job.language}
+              </span>
+            )
           )}
           <span className={`text-xs px-2.5 py-1 rounded-full ${getStatusBadge(job.status)}`}>
             {job.status}
@@ -289,6 +315,25 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
               <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/5">
                 <span className="text-xs text-white/30">{wordCount.toLocaleString()} words</span>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setRefineOpen((v) => !v)}
+                    disabled={regenerating}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all disabled:opacity-40 ${
+                      refineOpen
+                        ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+                        : "glass text-white/50 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Refine
+                  </button>
+                  <button
+                    onClick={() => handleRegenerate()}
+                    disabled={regenerating}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/50 hover:text-white text-xs transition-all hover:bg-white/5 disabled:opacity-40"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
+                    {regenerating ? "Generating…" : "Regenerate"}
+                  </button>
                   <CopyButton text={activeOutput.content} />
                   <DownloadButton
                     text={activeOutput.content}
@@ -296,7 +341,32 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                   />
                 </div>
               </div>
-              <div className="p-7 overflow-auto max-h-[65vh]">
+
+              {refineOpen && (
+                <div className="flex items-center gap-2 px-6 py-3 border-b border-white/5 bg-violet-500/5">
+                  <input
+                    type="text"
+                    value={refineInstruction}
+                    onChange={(e) => setRefineInstruction(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && refineInstruction.trim()) handleRegenerate(refineInstruction); }}
+                    placeholder="e.g. make it shorter, add more examples, focus on beginners…"
+                    className="flex-1 text-sm bg-transparent text-white placeholder-white/25 focus:outline-none"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => handleRegenerate(refineInstruction)}
+                    disabled={!refineInstruction.trim()}
+                    className="px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium hover:bg-violet-500 transition-all disabled:opacity-40"
+                  >
+                    Apply
+                  </button>
+                  <button onClick={() => setRefineOpen(false)} className="text-white/30 hover:text-white transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              <div className={`p-7 overflow-auto max-h-[65vh] transition-opacity ${regenerating ? "opacity-40 pointer-events-none" : ""}`}>
                 {activeTab === "twitter_thread" ? (
                   <TwitterThreadView content={activeOutput.content} />
                 ) : (
