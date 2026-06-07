@@ -1,6 +1,6 @@
 import { NextRequest, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateContent, generateTitle } from "@/lib/openai";
+import { generateContent, generateTitle, buildBrandVoiceNote, applyBrandVoice, type BrandVoice } from "@/lib/openai";
 import { PLAN_LIMITS, LANGUAGES, type ToneStyle, type Language } from "@/types";
 
 const VALID_TONES = new Set<ToneStyle>([
@@ -123,23 +123,26 @@ async function processJob(
 
     await supabase.from("jobs").update({ status: "generating", transcript }).eq("id", jobId);
 
-    const { data: templates } = await supabase
-      .from("prompt_templates").select("format, prompt").eq("user_id", userId);
+    const [{ data: templates }, { data: userData }] = await Promise.all([
+      supabase.from("prompt_templates").select("format, prompt").eq("user_id", userId),
+      supabase.from("users").select("brand_voice").eq("id", userId).single(),
+    ]);
     const customPrompts = Object.fromEntries(
       (templates ?? []).map((t: { format: string; prompt: string }) => [t.format, t.prompt])
     ) as Partial<Record<string, string>>;
+    const bvNote = buildBrandVoiceNote((userData?.brand_voice as BrandVoice) ?? null);
 
     // Wave 1: title + blog + twitter
     const [title, blog, twitter] = await Promise.all([
       generateTitle(transcript),
-      generateContent(transcript, "blog", tone, customPrompts["blog"], language),
-      generateContent(transcript, "twitter_thread", tone, customPrompts["twitter_thread"], language),
+      generateContent(transcript, "blog", tone, applyBrandVoice("blog", customPrompts["blog"], bvNote), language),
+      generateContent(transcript, "twitter_thread", tone, applyBrandVoice("twitter_thread", customPrompts["twitter_thread"], bvNote), language),
     ]);
 
     // Wave 2: linkedin + newsletter
     const [linkedin, newsletter] = await Promise.all([
-      generateContent(transcript, "linkedin", tone, customPrompts["linkedin"], language),
-      generateContent(transcript, "newsletter", tone, customPrompts["newsletter"], language),
+      generateContent(transcript, "linkedin", tone, applyBrandVoice("linkedin", customPrompts["linkedin"], bvNote), language),
+      generateContent(transcript, "newsletter", tone, applyBrandVoice("newsletter", customPrompts["newsletter"], bvNote), language),
     ]);
 
     await supabase.from("jobs").update({ title }).eq("id", jobId);

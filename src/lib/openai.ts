@@ -127,6 +127,35 @@ export async function generateContent(
   return response.choices[0].message.content ?? ''
 }
 
+export interface BrandVoice {
+  persona?: string;
+  audience?: string;
+  style_notes?: string;
+  key_phrases?: string;
+  avoid_phrases?: string;
+}
+
+export function buildBrandVoiceNote(bv: BrandVoice | null | undefined): string {
+  if (!bv) return "";
+  const lines: string[] = [];
+  if (bv.persona?.trim())       lines.push(`- Writing as: ${bv.persona.trim()}`);
+  if (bv.audience?.trim())      lines.push(`- Target audience: ${bv.audience.trim()}`);
+  if (bv.style_notes?.trim())   lines.push(`- Style rules: ${bv.style_notes.trim()}`);
+  if (bv.key_phrases?.trim())   lines.push(`- Include these phrases/terms: ${bv.key_phrases.trim()}`);
+  if (bv.avoid_phrases?.trim()) lines.push(`- Avoid these phrases: ${bv.avoid_phrases.trim()}`);
+  if (lines.length === 0) return "";
+  return `\n\nBrand Voice (apply consistently throughout):\n${lines.join("\n")}`;
+}
+
+export function applyBrandVoice(
+  format: ContentFormat,
+  customPrompt: string | undefined,
+  brandVoiceNote: string
+): string | undefined {
+  if (!brandVoiceNote) return customPrompt;
+  return (customPrompt ?? DEFAULT_PROMPTS[format]) + brandVoiceNote;
+}
+
 export async function generateTitle(transcript: string): Promise<string> {
   const response = await openai.chat.completions.create({
     model: 'llama-3.1-8b-instant',
