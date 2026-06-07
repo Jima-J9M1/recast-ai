@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState, useCallback } from "react";
-import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X } from "lucide-react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -13,6 +13,7 @@ const TABS = [
   { type: "twitter_thread" as const, icon: Hash, label: "Twitter" },
   { type: "linkedin" as const, icon: Briefcase, label: "LinkedIn" },
   { type: "newsletter" as const, icon: Mail, label: "Newsletter" },
+  { type: "extras" as const, icon: Layers, label: "Extras" },
 ];
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
@@ -327,25 +328,29 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
               <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/5">
                 <span className="text-xs text-white/30">{wordCount.toLocaleString()} words</span>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setRefineOpen((v) => !v)}
-                    disabled={regenerating}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all disabled:opacity-40 ${
-                      refineOpen
-                        ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
-                        : "glass text-white/50 hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    <Sparkles className="w-3.5 h-3.5" /> Refine
-                  </button>
-                  <button
-                    onClick={() => handleRegenerate()}
-                    disabled={regenerating}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/50 hover:text-white text-xs transition-all hover:bg-white/5 disabled:opacity-40"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
-                    {regenerating ? "Generating…" : "Regenerate"}
-                  </button>
+                  {activeTab !== "extras" && (
+                    <>
+                      <button
+                        onClick={() => setRefineOpen((v) => !v)}
+                        disabled={regenerating}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all disabled:opacity-40 ${
+                          refineOpen
+                            ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+                            : "glass text-white/50 hover:text-white hover:bg-white/5"
+                        }`}
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Refine
+                      </button>
+                      <button
+                        onClick={() => handleRegenerate()}
+                        disabled={regenerating}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/50 hover:text-white text-xs transition-all hover:bg-white/5 disabled:opacity-40"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
+                        {regenerating ? "Generating…" : "Regenerate"}
+                      </button>
+                    </>
+                  )}
                   <CopyButton text={activeOutput.content} />
                   <DownloadButton
                     text={activeOutput.content}
@@ -354,7 +359,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                 </div>
               </div>
 
-              {refineOpen && (
+              {refineOpen && activeTab !== "extras" && (
                 <div className="flex items-center gap-2 px-6 py-3 border-b border-white/5 bg-violet-500/5">
                   <input
                     type="text"

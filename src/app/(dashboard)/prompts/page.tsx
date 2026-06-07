@@ -4,10 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { FileText, Hash, Briefcase, Mail, Save, RotateCcw, Lock, Loader2, Check } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { DEFAULT_PROMPTS } from "@/lib/openai";
-import type { OutputType } from "@/types";
+import { DEFAULT_PROMPTS, type ContentFormat } from "@/lib/openai";
 
-const FORMATS: { type: OutputType; label: string; icon: typeof FileText; desc: string }[] = [
+const FORMATS: { type: ContentFormat; label: string; icon: typeof FileText; desc: string }[] = [
   { type: "blog", label: "Blog Post", icon: FileText, desc: "Long-form SEO article" },
   { type: "twitter_thread", label: "Twitter Thread", icon: Hash, desc: "Viral thread format" },
   { type: "linkedin", label: "LinkedIn Post", icon: Briefcase, desc: "Professional post" },
@@ -24,9 +23,9 @@ interface SaveState {
 
 export default function PromptsPage() {
   const [isPro, setIsPro] = useState<boolean | null>(null);
-  const [activeFormat, setActiveFormat] = useState<OutputType>("blog");
-  const [drafts, setDrafts] = useState<Partial<Record<OutputType, string>>>({});
-  const [saved, setSaved] = useState<Partial<Record<OutputType, string>>>({});
+  const [activeFormat, setActiveFormat] = useState<ContentFormat>("blog");
+  const [drafts, setDrafts] = useState<Partial<Record<ContentFormat, string>>>({});
+  const [saved, setSaved] = useState<Partial<Record<ContentFormat, string>>>({});
   const [saveState, setSaveState] = useState<SaveState>({ saving: false, saved: false, error: "" });
 
   const loadTemplates = useCallback(async () => {
@@ -42,8 +41,8 @@ export default function PromptsPage() {
     setIsPro(profile?.plan === "pro");
 
     const res = await fetch("/api/prompt-templates");
-    const json = await res.json() as { templates: { format: OutputType; prompt: string }[] };
-    const map: Partial<Record<OutputType, string>> = {};
+    const json = await res.json() as { templates: { format: ContentFormat; prompt: string }[] };
+    const map: Partial<Record<ContentFormat, string>> = {};
     for (const t of json.templates ?? []) map[t.format] = t.prompt;
     setSaved(map);
     setDrafts(map);

@@ -1,6 +1,6 @@
 import { NextRequest, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateContent, generateTitle, buildBrandVoiceNote, applyBrandVoice, SEO_BLOG_PROMPT, type BrandVoice } from "@/lib/openai";
+import { generateContent, generateTitle, generateExtras, buildBrandVoiceNote, applyBrandVoice, SEO_BLOG_PROMPT, type BrandVoice } from "@/lib/openai";
 import { PLAN_LIMITS, LANGUAGES, type ToneStyle, type Language } from "@/types";
 
 const VALID_TONES = new Set<ToneStyle>([
@@ -146,10 +146,11 @@ async function processJob(
       generateContent(transcript, "twitter_thread", tone, applyBrandVoice("twitter_thread", customPrompts["twitter_thread"], bvNote), language),
     ]);
 
-    // Wave 2: linkedin + newsletter
-    const [linkedin, newsletter] = await Promise.all([
+    // Wave 2: linkedin + newsletter + extras
+    const [linkedin, newsletter, extras] = await Promise.all([
       generateContent(transcript, "linkedin", tone, applyBrandVoice("linkedin", customPrompts["linkedin"], bvNote), language),
       generateContent(transcript, "newsletter", tone, applyBrandVoice("newsletter", customPrompts["newsletter"], bvNote), language),
+      generateExtras(transcript),
     ]);
 
     await supabase.from("jobs").update({ title }).eq("id", jobId);
@@ -158,6 +159,7 @@ async function processJob(
       { job_id: jobId, type: "twitter_thread", content: twitter },
       { job_id: jobId, type: "linkedin", content: linkedin },
       { job_id: jobId, type: "newsletter", content: newsletter },
+      { job_id: jobId, type: "extras", content: extras },
     ]);
     await supabase.from("jobs").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", jobId);
     await supabase.rpc("increment_usage", { p_user_id: userId, p_month: currentMonth });

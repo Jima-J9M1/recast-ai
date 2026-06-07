@@ -175,6 +175,40 @@ export function applyBrandVoice(
   return (customPrompt ?? DEFAULT_PROMPTS[format]) + brandVoiceNote;
 }
 
+const EXTRAS_PROMPT = `You are a content analyst. Extract the most shareable and valuable pieces from this transcript.
+
+Return EXACTLY this Markdown structure with no other text:
+
+## Key Quotes
+Extract 3-5 powerful quotable lines (verbatim or near-verbatim from the transcript):
+> "Quote text here"
+
+## Key Takeaways
+List 5-7 concise, actionable insights:
+- Insight here
+
+## Content Hooks
+Write 3 attention-grabbing openers for different contexts:
+**Blog hook:** Opening sentence for a blog post intro
+**Social hook:** Opening line for a Twitter or LinkedIn post
+**Email hook:** Compelling email subject line
+
+Transcript:
+{transcript}
+
+Return only the three Markdown sections above.`
+
+export async function generateExtras(transcript: string): Promise<string> {
+  const prompt = EXTRAS_PROMPT.replace('{transcript}', transcript.slice(0, TRANSCRIPT_LIMIT));
+  const response = await openai.chat.completions.create({
+    model: 'llama-3.1-8b-instant',
+    messages: [{ role: 'user', content: prompt }],
+    max_tokens: 700,
+    temperature: 0.5,
+  });
+  return response.choices[0].message.content ?? '';
+}
+
 export async function generateTitle(transcript: string): Promise<string> {
   const response = await openai.chat.completions.create({
     model: 'llama-3.1-8b-instant',
