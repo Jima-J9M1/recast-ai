@@ -2,7 +2,7 @@ export type Plan = 'free' | 'starter' | 'pro'
 
 export type JobStatus = 'pending' | 'transcribing' | 'generating' | 'completed' | 'failed' | 'cancelled'
 
-export type OutputType = 'blog' | 'twitter_thread' | 'linkedin' | 'newsletter'
+export type OutputType = 'blog' | 'twitter_thread' | 'linkedin' | 'newsletter' | 'extras'
 
 export type ToneStyle = 'professional' | 'casual' | 'storytelling' | 'educational' | 'humorous'
 
