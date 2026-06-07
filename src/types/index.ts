@@ -42,6 +42,7 @@ export interface Job {
   status: JobStatus
   tone: ToneStyle
   language: string
+  seo_mode: boolean
   transcript: string | null
   error_message: string | null
   created_at: string

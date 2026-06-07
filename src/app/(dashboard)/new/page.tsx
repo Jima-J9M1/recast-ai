@@ -31,6 +31,7 @@ export default function NewPage() {
   const [url, setUrl] = useState("");
   const [tone, setTone] = useState<ToneStyle>("professional");
   const [language, setLanguage] = useState<Language>("English");
+  const [seoMode, setSeoMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [creditsLeft, setCreditsLeft] = useState<number | null>(null);
@@ -60,7 +61,7 @@ export default function NewPage() {
       const res = await fetch("/api/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, tone, language }),
+        body: JSON.stringify({ url, tone, language, seo_mode: seoMode }),
       });
       const data = await res.json() as { jobId?: string; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Something went wrong");
@@ -164,11 +165,32 @@ export default function NewPage() {
                 ))}
               </select>
             </div>
-            {language !== "English" && (
+            {language === "English" ? null : (
               <p className="mt-2 text-xs text-violet-300/70">
                 {selectedLang?.flag} All 4 formats will be written in {language}.
               </p>
             )}
+          </div>
+
+          {/* SEO Mode */}
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <p className="text-xs font-semibold text-white/50 uppercase tracking-wider">SEO Mode</p>
+              <p className="text-xs text-white/25 mt-1">
+                {seoMode
+                  ? "Blog will include focus keyword, meta description & FAQ"
+                  : "Adds SEO structure to the blog post only"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSeoMode((v) => !v)}
+              disabled={loading}
+              aria-pressed={seoMode}
+              className={`relative w-11 h-6 rounded-full transition-all disabled:opacity-40 shrink-0 ${seoMode ? "bg-violet-600" : "bg-white/10"}`}
+            >
+              <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${seoMode ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
           </div>
 
           {error && (
