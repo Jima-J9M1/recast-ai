@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateContent, DEFAULT_PROMPTS, type ContentFormat } from "@/lib/openai";
+import { generateContent, DEFAULT_PROMPTS, buildBrandVoiceNote, type BrandVoice, type ContentFormat } from "@/lib/openai";
 import type { ToneStyle } from "@/types";
 
 const VALID_FORMATS = new Set<ContentFormat>(["blog", "twitter_thread", "linkedin", "newsletter"]);
@@ -32,14 +32,18 @@ export async function POST(
   if (job.status !== "completed") return Response.json({ error: "Job not completed" }, { status: 400 });
   if (!job.transcript) return Response.json({ error: "No transcript available" }, { status: 400 });
 
-  const { data: template } = await supabase
-    .from("prompt_templates")
-    .select("prompt")
-    .eq("user_id", user.id)
-    .eq("format", format)
-    .maybeSingle();
+  const [{ data: template }, { data: userData }] = await Promise.all([
+    supabase.from("prompt_templates").select("prompt").eq("user_id", user.id).eq("format", format).maybeSingle(),
+    supabase.from("users").select("brand_voice").eq("id", user.id).single(),
+  ]);
 
+  const bvNote = buildBrandVoiceNote((userData?.brand_voice as BrandVoice) ?? null);
   let customPrompt: string | undefined = template?.prompt;
+
+  if (bvNote) {
+    customPrompt = (customPrompt ?? DEFAULT_PROMPTS[format]) + bvNote;
+  }
+
   const instruction = body.instruction?.trim();
   if (instruction) {
     const base = customPrompt ?? DEFAULT_PROMPTS[format];
