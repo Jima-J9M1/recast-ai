@@ -1,6 +1,6 @@
 import { NextRequest, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateContent, generateTitle, generateExtras, buildBrandVoiceNote, applyBrandVoice, SEO_BLOG_PROMPT, type BrandVoice } from "@/lib/openai";
+import { generateAndSave } from "@/lib/processor";
 import { PLAN_LIMITS, LANGUAGES, type ToneStyle, type Language } from "@/types";
 
 const VALID_TONES = new Set<ToneStyle>([
@@ -126,43 +126,8 @@ async function processJob(
 
     await supabase.from("jobs").update({ status: "generating", transcript }).eq("id", jobId);
 
-    const [{ data: templates }, { data: userData }] = await Promise.all([
-      supabase.from("prompt_templates").select("format, prompt").eq("user_id", userId),
-      supabase.from("users").select("brand_voice").eq("id", userId).single(),
-    ]);
-    const customPrompts = Object.fromEntries(
-      (templates ?? []).map((t: { format: string; prompt: string }) => [t.format, t.prompt])
-    ) as Partial<Record<string, string>>;
-    const bvNote = buildBrandVoiceNote((userData?.brand_voice as BrandVoice) ?? null);
+    await generateAndSave(jobId, transcript, tone, language, seoMode, userId, currentMonth);
 
-    const blogPrompt = seoMode
-      ? SEO_BLOG_PROMPT + bvNote
-      : applyBrandVoice("blog", customPrompts["blog"], bvNote);
-
-    // Wave 1: title + blog + twitter
-    const [title, blog, twitter] = await Promise.all([
-      generateTitle(transcript),
-      generateContent(transcript, "blog", tone, blogPrompt, language),
-      generateContent(transcript, "twitter_thread", tone, applyBrandVoice("twitter_thread", customPrompts["twitter_thread"], bvNote), language),
-    ]);
-
-    // Wave 2: linkedin + newsletter + extras
-    const [linkedin, newsletter, extras] = await Promise.all([
-      generateContent(transcript, "linkedin", tone, applyBrandVoice("linkedin", customPrompts["linkedin"], bvNote), language),
-      generateContent(transcript, "newsletter", tone, applyBrandVoice("newsletter", customPrompts["newsletter"], bvNote), language),
-      generateExtras(transcript),
-    ]);
-
-    await supabase.from("jobs").update({ title }).eq("id", jobId);
-    await supabase.from("outputs").insert([
-      { job_id: jobId, type: "blog", content: blog },
-      { job_id: jobId, type: "twitter_thread", content: twitter },
-      { job_id: jobId, type: "linkedin", content: linkedin },
-      { job_id: jobId, type: "newsletter", content: newsletter },
-      { job_id: jobId, type: "extras", content: extras },
-    ]);
-    await supabase.from("jobs").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", jobId);
-    await supabase.rpc("increment_usage", { p_user_id: userId, p_month: currentMonth });
     console.log(`[job:${jobId}] completed`);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
