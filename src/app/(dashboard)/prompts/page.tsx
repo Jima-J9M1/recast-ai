@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { FileText, Hash, Briefcase, Mail, Save, RotateCcw, Lock, Loader2, Check } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { DEFAULT_PROMPTS, type ContentFormat } from "@/lib/openai";
+import { DEFAULT_PROMPTS, type ContentFormat } from "@/lib/prompts";
 
 const FORMATS: { type: ContentFormat; label: string; icon: typeof FileText; desc: string }[] = [
   { type: "blog", label: "Blog Post", icon: FileText, desc: "Long-form SEO article" },
