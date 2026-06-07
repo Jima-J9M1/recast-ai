@@ -4,10 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { FileText, Hash, Briefcase, Mail, Save, RotateCcw, Lock, Loader2, Check } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { DEFAULT_PROMPTS } from "@/lib/openai";
-import type { OutputType } from "@/types";
+import { DEFAULT_PROMPTS, type ContentFormat } from "@/lib/openai";
 
-const FORMATS: { type: OutputType; label: string; icon: typeof FileText; desc: string }[] = [
+const FORMATS: { type: ContentFormat; label: string; icon: typeof FileText; desc: string }[] = [
   { type: "blog", label: "Blog Post", icon: FileText, desc: "Long-form SEO article" },
   { type: "twitter_thread", label: "Twitter Thread", icon: Hash, desc: "Viral thread format" },
   { type: "linkedin", label: "LinkedIn Post", icon: Briefcase, desc: "Professional post" },
@@ -24,9 +23,9 @@ interface SaveState {
 
 export default function PromptsPage() {
   const [isPro, setIsPro] = useState<boolean | null>(null);
-  const [activeFormat, setActiveFormat] = useState<OutputType>("blog");
-  const [drafts, setDrafts] = useState<Partial<Record<OutputType, string>>>({});
-  const [saved, setSaved] = useState<Partial<Record<OutputType, string>>>({});
+  const [activeFormat, setActiveFormat] = useState<ContentFormat>("blog");
+  const [drafts, setDrafts] = useState<Partial<Record<ContentFormat, string>>>({});
+  const [saved, setSaved] = useState<Partial<Record<ContentFormat, string>>>({});
   const [saveState, setSaveState] = useState<SaveState>({ saving: false, saved: false, error: "" });
 
   const loadTemplates = useCallback(async () => {
@@ -39,11 +38,11 @@ export default function PromptsPage() {
       .select("plan")
       .eq("id", user.id)
       .single();
-    setIsPro(profile?.plan === "pro");
+    setIsPro(profile?.plan === "pro" || profile?.plan === "starter");
 
     const res = await fetch("/api/prompt-templates");
-    const json = await res.json() as { templates: { format: OutputType; prompt: string }[] };
-    const map: Partial<Record<OutputType, string>> = {};
+    const json = await res.json() as { templates: { format: ContentFormat; prompt: string }[] };
+    const map: Partial<Record<ContentFormat, string>> = {};
     for (const t of json.templates ?? []) map[t.format] = t.prompt;
     setSaved(map);
     setDrafts(map);
@@ -108,7 +107,7 @@ export default function PromptsPage() {
         <h1 className="text-2xl font-bold text-white">Custom prompts</h1>
         <p className="text-white/40 mt-1">
           Override the AI instructions for each content format.{" "}
-          <span className="text-violet-400 font-medium">Pro only.</span>
+          <span className="text-violet-400 font-medium">Starter &amp; Pro.</span>
         </p>
       </div>
 
@@ -118,7 +117,7 @@ export default function PromptsPage() {
             <Lock className="w-5 h-5 text-violet-400" />
           </div>
           <div className="flex-1">
-            <p className="text-white font-semibold mb-1">Pro feature</p>
+            <p className="text-white font-semibold mb-1">Starter &amp; Pro feature</p>
             <p className="text-white/50 text-sm mb-4">
               Custom prompts let you control exactly how the AI writes each format — match your brand voice,
               add your own structure, or inject instructions the default prompt doesn&apos;t have.
@@ -127,13 +126,13 @@ export default function PromptsPage() {
               href="/upgrade"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-500 transition-all shadow-lg shadow-violet-900/30"
             >
-              Upgrade to Pro — $49/mo
+              Upgrade to Starter — $19/mo
             </Link>
           </div>
         </div>
       )}
 
-      <div className={`${!isPro ? "opacity-50 pointer-events-none select-none" : ""}`}>
+      <div className={`${isPro ? "" : "opacity-50 pointer-events-none select-none"}`}>
         {/* Format tabs */}
         <div className="flex gap-1.5 mb-6 p-1 glass rounded-xl w-fit">
           {FORMATS.map((f) => {
@@ -190,13 +189,9 @@ export default function PromptsPage() {
                 disabled={!isDirty || saveState.saving}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-violet-600 text-white hover:bg-violet-500"
               >
-                {saveState.saving ? (
-                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>
-                ) : saveState.saved ? (
-                  <><Check className="w-3.5 h-3.5 text-emerald-400" /> Saved</>
-                ) : (
-                  <><Save className="w-3.5 h-3.5" /> Save</>
-                )}
+                {saveState.saving && <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>}
+                {saveState.saved && <><Check className="w-3.5 h-3.5 text-emerald-400" /> Saved</>}
+                {!saveState.saving && !saveState.saved && <><Save className="w-3.5 h-3.5" /> Save</>}
               </button>
             </div>
           </div>

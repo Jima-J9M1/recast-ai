@@ -1,11 +1,13 @@
 import { NextRequest, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateContent, generateTitle } from "@/lib/openai";
-import { PLAN_LIMITS, type ToneStyle } from "@/types";
+import { generateAndSave } from "@/lib/processor";
+import { PLAN_LIMITS, LANGUAGES, type ToneStyle, type Language } from "@/types";
 
 const VALID_TONES = new Set<ToneStyle>([
   "professional", "casual", "storytelling", "educational", "humorous",
 ]);
+
+const VALID_LANGUAGES = new Set<Language>(LANGUAGES.map((l) => l.code));
 
 async function fetchYoutubeTranscript(url: string): Promise<string> {
   const apiKey = process.env.SUPADATA_API_KEY;
@@ -46,11 +48,9 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await request.json() as { url?: string; tone?: string };
+  const body = await request.json() as { url?: string; tone?: string; language?: string; seo_mode?: boolean };
   const { url } = body;
 
   if (!url || typeof url !== "string") {
@@ -61,16 +61,15 @@ export async function POST(request: NextRequest) {
     ? (body.tone as ToneStyle)
     : "professional";
 
+  const language: Language = VALID_LANGUAGES.has(body.language as Language)
+    ? (body.language as Language)
+    : "English";
+
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   const [{ data: profile }, { data: usage }] = await Promise.all([
     supabase.from("users").select("plan").eq("id", user.id).single(),
-    supabase
-      .from("usage")
-      .select("count")
-      .eq("user_id", user.id)
-      .eq("month", currentMonth)
-      .single(),
+    supabase.from("usage").select("count").eq("user_id", user.id).eq("month", currentMonth).single(),
   ]);
 
   const plan = (profile?.plan ?? "free") as keyof typeof PLAN_LIMITS;
@@ -84,15 +83,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const seoMode = body.seo_mode === true;
+
   const { data: job, error: jobError } = await supabase
     .from("jobs")
-    .insert({
-      user_id: user.id,
-      source_type: "youtube",
-      source_url: url,
-      status: "transcribing",
-      tone,
-    })
+    .insert({ user_id: user.id, source_type: "youtube", source_url: url, status: "transcribing", tone, language, seo_mode: seoMode })
     .select("id")
     .single();
 
@@ -100,8 +95,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Failed to create job" }, { status: 500 });
   }
 
-  // after() keeps the serverless function alive past the response on Vercel
-  after(() => processJob(job.id, url, tone, user.id, currentMonth));
+  after(() => processJob(job.id, url, tone, language, seoMode, user.id, currentMonth));
 
   return Response.json({ jobId: job.id });
 }
@@ -110,10 +104,11 @@ async function processJob(
   jobId: string,
   url: string,
   tone: ToneStyle,
+  language: Language,
+  seoMode: boolean,
   userId: string,
   currentMonth: string
 ) {
-  // Service-role client bypasses RLS — needed for writes from after() context
   const { createClient } = await import("@supabase/supabase-js");
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -121,75 +116,22 @@ async function processJob(
   );
 
   try {
-    console.log(`[job:${jobId}] starting — url: ${url} tone: ${tone}`);
+    console.log(`[job:${jobId}] starting — tone: ${tone} lang: ${language}`);
 
-    console.log(`[job:${jobId}] fetching transcript`);
     const transcript = await fetchYoutubeTranscript(url);
-    console.log(`[job:${jobId}] transcript fetched — ${transcript.length} chars`);
+    console.log(`[job:${jobId}] transcript: ${transcript.length} chars`);
 
-    const { data: check } = await supabase
-      .from("jobs")
-      .select("status")
-      .eq("id", jobId)
-      .single();
-    if (check?.status === "cancelled") {
-      console.log(`[job:${jobId}] cancelled before generation`);
-      return;
-    }
+    const { data: check } = await supabase.from("jobs").select("status").eq("id", jobId).single();
+    if (check?.status === "cancelled") return;
 
-    await supabase
-      .from("jobs")
-      .update({ status: "generating", transcript })
-      .eq("id", jobId);
+    await supabase.from("jobs").update({ status: "generating", transcript }).eq("id", jobId);
 
-    // Fetch user's custom prompt templates (Pro feature)
-    const { data: templates } = await supabase
-      .from("prompt_templates")
-      .select("format, prompt")
-      .eq("user_id", userId);
-    const customPrompts = Object.fromEntries(
-      (templates ?? []).map((t: { format: string; prompt: string }) => [t.format, t.prompt])
-    ) as Partial<Record<string, string>>;
+    await generateAndSave(jobId, transcript, tone, language, seoMode, userId, currentMonth);
 
-    // Wave 1: title + blog + twitter
-    console.log(`[job:${jobId}] wave 1 — title + blog + twitter`);
-    const [title, blog, twitter] = await Promise.all([
-      generateTitle(transcript),
-      generateContent(transcript, "blog", tone, customPrompts["blog"]),
-      generateContent(transcript, "twitter_thread", tone, customPrompts["twitter_thread"]),
-    ]);
-    console.log(`[job:${jobId}] wave 1 done`);
-
-    // Wave 2: linkedin + newsletter
-    console.log(`[job:${jobId}] wave 2 — linkedin + newsletter`);
-    const [linkedin, newsletter] = await Promise.all([
-      generateContent(transcript, "linkedin", tone, customPrompts["linkedin"]),
-      generateContent(transcript, "newsletter", tone, customPrompts["newsletter"]),
-    ]);
-    console.log(`[job:${jobId}] wave 2 done`);
-
-    await supabase.from("jobs").update({ title }).eq("id", jobId);
-
-    await supabase.from("outputs").insert([
-      { job_id: jobId, type: "blog", content: blog },
-      { job_id: jobId, type: "twitter_thread", content: twitter },
-      { job_id: jobId, type: "linkedin", content: linkedin },
-      { job_id: jobId, type: "newsletter", content: newsletter },
-    ]);
-
-    await supabase
-      .from("jobs")
-      .update({ status: "completed", completed_at: new Date().toISOString() })
-      .eq("id", jobId);
-
-    await supabase.rpc("increment_usage", { p_user_id: userId, p_month: currentMonth });
     console.log(`[job:${jobId}] completed`);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    console.error(`[job:${jobId}] FAILED:`, message, err);
-    await supabase
-      .from("jobs")
-      .update({ status: "failed", error_message: message })
-      .eq("id", jobId);
+    console.error(`[job:${jobId}] FAILED:`, message);
+    await supabase.from("jobs").update({ status: "failed", error_message: message }).eq("id", jobId);
   }
 }

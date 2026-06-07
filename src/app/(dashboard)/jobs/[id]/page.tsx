@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState, useCallback } from "react";
-import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download } from "lucide-react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -13,6 +13,7 @@ const TABS = [
   { type: "twitter_thread" as const, icon: Hash, label: "Twitter" },
   { type: "linkedin" as const, icon: Briefcase, label: "LinkedIn" },
   { type: "newsletter" as const, icon: Mail, label: "Newsletter" },
+  { type: "extras" as const, icon: Layers, label: "Extras" },
 ];
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
@@ -73,11 +74,11 @@ function TwitterThreadView({ content }: Readonly<{ content: string }>) {
   }
   return (
     <div className="space-y-3">
-      {tweets.map((tweet, i) => {
+      {tweets.map((tweet) => {
         const charCount = tweet.length;
         const over = charCount > 280;
         return (
-          <div key={i} className="rounded-xl bg-white/2.5 border border-white/6 p-4">
+          <div key={tweet.slice(0, 40)} className="rounded-xl bg-white/2.5 border border-white/6 p-4">
             <p className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed">{tweet}</p>
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
               <span className={`text-xs tabular-nums ${over ? "text-red-400" : "text-white/25"}`}>
@@ -90,6 +91,13 @@ function TwitterThreadView({ content }: Readonly<{ content: string }>) {
       })}
     </div>
   );
+}
+
+function parseSeoMeta(content: string): { keyword: string; metaDesc: string } | null {
+  const kwMatch = /^\*\*SEO keyword:\*\*\s*(.+)/m.exec(content);
+  const metaMatch = /^\*\*Meta description:\*\*\s*(.+)/m.exec(content);
+  if (!kwMatch || !metaMatch) return null;
+  return { keyword: kwMatch[1].trim(), metaDesc: metaMatch[1].trim() };
 }
 
 function DownloadButton({ text, filename }: Readonly<{ text: string; filename: string }>) {
@@ -114,6 +122,30 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   const [activeTab, setActiveTab] = useState<Output["type"]>("blog");
   const [loading, setLoading] = useState(true);
   const [stopping, setStopping] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [refineOpen, setRefineOpen] = useState(false);
+  const [refineInstruction, setRefineInstruction] = useState("");
+
+  const handleRegenerate = useCallback(async (instruction?: string) => {
+    setRegenerating(true);
+    setRefineOpen(false);
+    try {
+      const res = await fetch(`/api/jobs/${id}/regenerate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format: activeTab, instruction }),
+      });
+      if (res.ok) {
+        const { content } = await res.json() as { content: string };
+        setOutputs((prev) =>
+          prev.map((o) => (o.type === activeTab ? { ...o, content } : o))
+        );
+        setRefineInstruction("");
+      }
+    } finally {
+      setRegenerating(false);
+    }
+  }, [id, activeTab]);
 
   const loadOutputs = useCallback(async (jobId: string) => {
     const supabase = createClient();
@@ -194,6 +226,18 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
           {job.tone && (
             <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-white/40 border border-white/8">
               {TONE_LABELS[job.tone] ?? job.tone}
+            </span>
+          )}
+          {job.language && job.language === "English" ? null : (
+            job.language && (
+              <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-white/40 border border-white/8">
+                🌐 {job.language}
+              </span>
+            )
+          )}
+          {job.seo_mode && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              SEO
             </span>
           )}
           <span className={`text-xs px-2.5 py-1 rounded-full ${getStatusBadge(job.status)}`}>
@@ -284,6 +328,29 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
               <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/5">
                 <span className="text-xs text-white/30">{wordCount.toLocaleString()} words</span>
                 <div className="flex items-center gap-2">
+                  {activeTab !== "extras" && (
+                    <>
+                      <button
+                        onClick={() => setRefineOpen((v) => !v)}
+                        disabled={regenerating}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all disabled:opacity-40 ${
+                          refineOpen
+                            ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+                            : "glass text-white/50 hover:text-white hover:bg-white/5"
+                        }`}
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Refine
+                      </button>
+                      <button
+                        onClick={() => handleRegenerate()}
+                        disabled={regenerating}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/50 hover:text-white text-xs transition-all hover:bg-white/5 disabled:opacity-40"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
+                        {regenerating ? "Generating…" : "Regenerate"}
+                      </button>
+                    </>
+                  )}
                   <CopyButton text={activeOutput.content} />
                   <DownloadButton
                     text={activeOutput.content}
@@ -291,7 +358,50 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                   />
                 </div>
               </div>
-              <div className="p-7 overflow-auto max-h-[65vh]">
+
+              {refineOpen && activeTab !== "extras" && (
+                <div className="flex items-center gap-2 px-6 py-3 border-b border-white/5 bg-violet-500/5">
+                  <input
+                    type="text"
+                    value={refineInstruction}
+                    onChange={(e) => setRefineInstruction(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && refineInstruction.trim()) handleRegenerate(refineInstruction); }}
+                    placeholder="e.g. make it shorter, add more examples, focus on beginners…"
+                    className="flex-1 text-sm bg-transparent text-white placeholder-white/25 focus:outline-none"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => handleRegenerate(refineInstruction)}
+                    disabled={!refineInstruction.trim()}
+                    className="px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium hover:bg-violet-500 transition-all disabled:opacity-40"
+                  >
+                    Apply
+                  </button>
+                  <button onClick={() => setRefineOpen(false)} className="text-white/30 hover:text-white transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              <div className={`p-7 overflow-auto max-h-[65vh] transition-opacity ${regenerating ? "opacity-40 pointer-events-none" : ""}`}>
+                {job.seo_mode && activeTab === "blog" && (() => {
+                  const seo = parseSeoMeta(activeOutput.content);
+                  return seo ? (
+                    <div className="mb-5 p-4 rounded-xl bg-emerald-500/8 border border-emerald-500/20 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">SEO</span>
+                      </div>
+                      <div>
+                        <p className="text-xs text-white/40">Focus keyword</p>
+                        <p className="text-sm text-white/80 font-medium">{seo.keyword}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-white/40">Meta description ({seo.metaDesc.length} chars)</p>
+                        <p className="text-sm text-white/70">{seo.metaDesc}</p>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
                 {activeTab === "twitter_thread" ? (
                   <TwitterThreadView content={activeOutput.content} />
                 ) : (

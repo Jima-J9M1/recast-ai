@@ -28,8 +28,8 @@ export async function PUT(request: NextRequest) {
     .select("plan")
     .eq("id", user.id)
     .single();
-  if (profile?.plan !== "pro") {
-    return Response.json({ error: "Custom prompts require a Pro plan." }, { status: 403 });
+  if (profile?.plan !== "pro" && profile?.plan !== "starter") {
+    return Response.json({ error: "Custom prompts require a Starter or Pro plan." }, { status: 403 });
   }
 
   const body = await request.json() as { format?: string; prompt?: string | null };
