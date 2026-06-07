@@ -1,6 +1,6 @@
 import { NextRequest, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateContent, generateTitle, buildBrandVoiceNote, applyBrandVoice, type BrandVoice } from "@/lib/openai";
+import { generateContent, generateTitle, buildBrandVoiceNote, applyBrandVoice, SEO_BLOG_PROMPT, type BrandVoice } from "@/lib/openai";
 import { PLAN_LIMITS, LANGUAGES, type ToneStyle, type Language } from "@/types";
 
 const VALID_TONES = new Set<ToneStyle>([
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await request.json() as { url?: string; tone?: string; language?: string };
+  const body = await request.json() as { url?: string; tone?: string; language?: string; seo_mode?: boolean };
   const { url } = body;
 
   if (!url || typeof url !== "string") {
@@ -83,9 +83,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const seoMode = body.seo_mode === true;
+
   const { data: job, error: jobError } = await supabase
     .from("jobs")
-    .insert({ user_id: user.id, source_type: "youtube", source_url: url, status: "transcribing", tone, language })
+    .insert({ user_id: user.id, source_type: "youtube", source_url: url, status: "transcribing", tone, language, seo_mode: seoMode })
     .select("id")
     .single();
 
@@ -93,7 +95,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Failed to create job" }, { status: 500 });
   }
 
-  after(() => processJob(job.id, url, tone, language, user.id, currentMonth));
+  after(() => processJob(job.id, url, tone, language, seoMode, user.id, currentMonth));
 
   return Response.json({ jobId: job.id });
 }
@@ -103,6 +105,7 @@ async function processJob(
   url: string,
   tone: ToneStyle,
   language: Language,
+  seoMode: boolean,
   userId: string,
   currentMonth: string
 ) {
@@ -132,10 +135,14 @@ async function processJob(
     ) as Partial<Record<string, string>>;
     const bvNote = buildBrandVoiceNote((userData?.brand_voice as BrandVoice) ?? null);
 
+    const blogPrompt = seoMode
+      ? SEO_BLOG_PROMPT + bvNote
+      : applyBrandVoice("blog", customPrompts["blog"], bvNote);
+
     // Wave 1: title + blog + twitter
     const [title, blog, twitter] = await Promise.all([
       generateTitle(transcript),
-      generateContent(transcript, "blog", tone, applyBrandVoice("blog", customPrompts["blog"], bvNote), language),
+      generateContent(transcript, "blog", tone, blogPrompt, language),
       generateContent(transcript, "twitter_thread", tone, applyBrandVoice("twitter_thread", customPrompts["twitter_thread"], bvNote), language),
     ]);
 

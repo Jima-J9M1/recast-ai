@@ -92,6 +92,13 @@ function TwitterThreadView({ content }: Readonly<{ content: string }>) {
   );
 }
 
+function parseSeoMeta(content: string): { keyword: string; metaDesc: string } | null {
+  const kwMatch = /^\*\*SEO keyword:\*\*\s*(.+)/m.exec(content);
+  const metaMatch = /^\*\*Meta description:\*\*\s*(.+)/m.exec(content);
+  if (!kwMatch || !metaMatch) return null;
+  return { keyword: kwMatch[1].trim(), metaDesc: metaMatch[1].trim() };
+}
+
 function DownloadButton({ text, filename }: Readonly<{ text: string; filename: string }>) {
   function download() {
     const blob = new Blob([text], { type: "text/markdown" });
@@ -226,6 +233,11 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                 🌐 {job.language}
               </span>
             )
+          )}
+          {job.seo_mode && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              SEO
+            </span>
           )}
           <span className={`text-xs px-2.5 py-1 rounded-full ${getStatusBadge(job.status)}`}>
             {job.status}
@@ -367,6 +379,24 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
               )}
 
               <div className={`p-7 overflow-auto max-h-[65vh] transition-opacity ${regenerating ? "opacity-40 pointer-events-none" : ""}`}>
+                {job.seo_mode && activeTab === "blog" && (() => {
+                  const seo = parseSeoMeta(activeOutput.content);
+                  return seo ? (
+                    <div className="mb-5 p-4 rounded-xl bg-emerald-500/8 border border-emerald-500/20 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">SEO</span>
+                      </div>
+                      <div>
+                        <p className="text-xs text-white/40">Focus keyword</p>
+                        <p className="text-sm text-white/80 font-medium">{seo.keyword}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-white/40">Meta description ({seo.metaDesc.length} chars)</p>
+                        <p className="text-sm text-white/70">{seo.metaDesc}</p>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
                 {activeTab === "twitter_thread" ? (
                   <TwitterThreadView content={activeOutput.content} />
                 ) : (

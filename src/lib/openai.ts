@@ -22,6 +22,25 @@ const TONE_INSTRUCTIONS: Record<ToneStyle, string> = {
     'Inject wit and light humor throughout — clever observations, playful language, and a fun voice. Informative but never dry.',
 }
 
+export const SEO_BLOG_PROMPT = `You are an expert SEO content writer. Transform the following transcript into a search-engine-optimized blog post.
+
+Tone: {tone}
+
+Requirements:
+1. Start your response with exactly: "**SEO keyword:** [your chosen primary keyword]"
+2. Second line: "**Meta description:** [max 155 characters, contains the keyword]"
+3. Blank line, then the full article
+4. H1 title must contain the primary keyword
+5. Use the keyword naturally in the first 100 words and at least one H2 heading
+6. Structure: H1 → intro → 3-5 H2 sections → FAQ (3-5 questions readers would Google) → conclusion
+7. Target 900-1200 words (not counting the keyword/meta lines)
+8. Write for humans first — natural keyword placement only
+
+Transcript:
+{transcript}
+
+Write the full blog post in Markdown format.`
+
 export const DEFAULT_PROMPTS: Record<ContentFormat, string> = {
   blog: `You are an expert content writer. Transform the following transcript into an engaging, SEO-optimized blog post.
 
