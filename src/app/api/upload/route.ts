@@ -13,7 +13,7 @@ const ALLOWED_TYPES = new Set([
 const MAX_BYTES = 4 * 1024 * 1024; // 4 MB
 
 async function transcribeAudio(buffer: Buffer, filename: string, mimeType: string): Promise<string> {
-  const blob = new Blob([buffer], { type: mimeType });
+  const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
   const form = new FormData();
   form.append("file", blob, filename);
   form.append("model", "whisper-large-v3-turbo");
