@@ -1,45 +1,295 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square } from "lucide-react";
+import { use, useEffect, useState, useCallback } from "react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw } from "lucide-react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { createClient } from "@/lib/supabase/client";
 import type { Job, Output } from "@/types";
 
-const OUTPUT_TABS = [
-  { type: "blog" as const, icon: FileText, label: "Blog Post" },
-  { type: "twitter_thread" as const, icon: Hash, label: "Twitter Thread" },
-  { type: "linkedin" as const, icon: Briefcase, label: "LinkedIn" },
-  { type: "newsletter" as const, icon: Mail, label: "Newsletter" },
+const TABS = [
+  { type: "blog" as const,           icon: FileText,  label: "Blog Post"  },
+  { type: "twitter_thread" as const, icon: Hash,      label: "Twitter"    },
+  { type: "linkedin" as const,       icon: Briefcase, label: "LinkedIn"   },
+  { type: "newsletter" as const,     icon: Mail,      label: "Newsletter" },
+  { type: "extras" as const,         icon: Layers,    label: "Extras"     },
 ];
 
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
+const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
+const TONE_LABELS: Record<string, string> = {
+  professional: "💼 Professional",
+  casual:       "☕ Casual",
+  storytelling: "📖 Storytelling",
+  educational:  "🎓 Educational",
+  humorous:     "😄 Humorous",
+};
+
+function getTabClass(active: boolean, has: boolean): string {
+  if (active) return "bg-violet-600 text-white shadow-lg shadow-violet-900/40";
+  if (has)    return "text-white/50 hover:text-white hover:bg-white/5";
+  return "text-white/20 cursor-not-allowed";
+}
+
+function getStatusBadge(status: string) {
+  if (status === "completed") return "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+  if (status === "failed")    return "bg-red-500/10 text-red-400 border border-red-500/20";
+  if (status === "cancelled") return "bg-white/5 text-white/30 border border-white/10";
+  return "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+}
+
+function CopyButton({ text }: Readonly<{ text: string }>) {
+  const [copied, setCopied] = useState(false);
   async function copy() {
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
-
   return (
-    <button
-      onClick={copy}
-      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-sm transition-all"
-    >
-      {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+    <button onClick={copy} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/50 hover:text-white text-xs transition-all hover:bg-white/5">
+      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
       {copied ? "Copied!" : "Copy"}
     </button>
   );
 }
 
-export default function JobPage({ params }: { params: Promise<{ id: string }> }) {
+function parseTweets(content: string): string[] {
+  const blocks = content.split(/\n\n+/).map((b) => b.trim()).filter(Boolean);
+  const numbered = blocks.filter((b) => /^\d+\//.test(b));
+  if (numbered.length >= 2) return numbered;
+  return content.split(/(?=\n\d+\/)/).map((t) => t.trim()).filter(Boolean);
+}
+
+function TwitterThreadView({ content }: Readonly<{ content: string }>) {
+  const tweets = parseTweets(content);
+  if (tweets.length < 2) {
+    return <pre className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed font-sans">{content}</pre>;
+  }
+  return (
+    <div className="space-y-3">
+      {tweets.map((tweet) => {
+        const over = tweet.length > 280;
+        return (
+          <div key={tweet.slice(0, 40)} className="rounded-xl bg-white/2.5 border border-white/6 p-4">
+            <p className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed">{tweet}</p>
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+              <span className={`text-xs tabular-nums ${over ? "text-red-400" : "text-white/25"}`}>
+                {tweet.length} / 280{over ? " · over limit" : ""}
+              </span>
+              <CopyButton text={tweet} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function parseSeoMeta(content: string): { keyword: string; metaDesc: string } | null {
+  const kwMatch   = /^\*\*SEO keyword:\*\*\s*(.+)/m.exec(content);
+  const metaMatch = /^\*\*Meta description:\*\*\s*(.+)/m.exec(content);
+  if (!kwMatch || !metaMatch) return null;
+  return { keyword: kwMatch[1].trim(), metaDesc: metaMatch[1].trim() };
+}
+
+function DownloadButton({ text, filename }: Readonly<{ text: string; filename: string }>) {
+  function download() {
+    const blob = new Blob([text], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+  return (
+    <button onClick={download} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/50 hover:text-white text-xs transition-all hover:bg-white/5">
+      <Download className="w-3.5 h-3.5" /> Export
+    </button>
+  );
+}
+
+interface VersionPickerProps {
+  readonly versions: Output[];
+  readonly currentVersion: number;
+  readonly onSelect: (v: number) => void;
+  readonly onRestore: (v: number) => void;
+  readonly restoring: boolean;
+}
+
+function VersionPicker({ versions, currentVersion, onSelect, onRestore, restoring }: VersionPickerProps) {
+  const [open, setOpen] = useState(false);
+  const latestVersion = Math.max(...versions.map((v) => v.version));
+  const isLatest = currentVersion === latestVersion;
+
+  if (versions.length <= 1) return null;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
+          open ? "bg-violet-600/20 text-violet-300 border border-violet-500/30" : "glass text-white/50 hover:text-white hover:bg-white/5"
+        }`}
+      >
+        <History className="w-3.5 h-3.5" />
+        v{currentVersion}
+        {!isLatest && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 z-20 w-52 glass rounded-xl border border-white/10 shadow-xl overflow-hidden">
+          <p className="text-xs text-white/30 px-3 pt-3 pb-1.5 font-medium uppercase tracking-wider">Version history</p>
+          {[...versions].sort((a, b) => b.version - a.version).map((v) => {
+            const isViewing  = v.version === currentVersion;
+            const isNewest   = v.version === latestVersion;
+            return (
+              <div
+                key={v.version}
+                className={`flex items-center justify-between px-3 py-2.5 hover:bg-white/5 transition-colors ${isViewing ? "bg-violet-600/10" : ""}`}
+              >
+                <button
+                  onClick={() => { onSelect(v.version); setOpen(false); }}
+                  className="flex items-center gap-2 text-sm text-left flex-1 min-w-0"
+                >
+                  <span className={`font-medium ${isViewing ? "text-violet-300" : "text-white/70"}`}>
+                    v{v.version}
+                  </span>
+                  {isNewest && <span className="text-xs text-white/30">latest</span>}
+                  {isViewing && !isNewest && <span className="text-xs text-amber-400">viewing</span>}
+                </button>
+                {!isNewest && (
+                  <button
+                    onClick={() => { onRestore(v.version); setOpen(false); }}
+                    disabled={restoring}
+                    className="flex items-center gap-1 text-xs text-white/30 hover:text-violet-300 transition-colors disabled:opacity-40 shrink-0"
+                    title="Restore this version"
+                  >
+                    <RotateCcw className="w-3 h-3" /> Restore
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function JobPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = use(params);
-  const [job, setJob] = useState<Job | null>(null);
-  const [outputs, setOutputs] = useState<Output[]>([]);
+  const [job, setJob]           = useState<Job | null>(null);
+  const [outputs, setOutputs]   = useState<Output[]>([]);
   const [activeTab, setActiveTab] = useState<Output["type"]>("blog");
-  const [loading, setLoading] = useState(true);
+  const [viewingVersions, setViewingVersions] = useState<Partial<Record<string, number>>>({});
+  const [loading, setLoading]   = useState(true);
   const [stopping, setStopping] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [restoring, setRestoring]       = useState(false);
+  const [refineOpen, setRefineOpen]     = useState(false);
+  const [refineInstruction, setRefineInstruction] = useState("");
+
+  const loadOutputs = useCallback(async (jobId: string) => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("outputs")
+      .select("*")
+      .eq("job_id", jobId)
+      .order("version", { ascending: true });
+    setOutputs(data ?? []);
+  }, []);
+
+  useEffect(() => {
+    const supabase = createClient();
+    async function init() {
+      const { data } = await supabase.from("jobs").select("*").eq("id", id).single();
+      if (data) {
+        setJob(data);
+        if (data.status === "completed") await loadOutputs(id);
+      }
+      setLoading(false);
+    }
+    init();
+    const interval = setInterval(async () => {
+      const { data } = await supabase.from("jobs").select("*").eq("id", id).single();
+      if (!data) return;
+      setJob(data);
+      if (data.status === "completed") {
+        await loadOutputs(id);
+        clearInterval(interval);
+      } else if (TERMINAL_STATUSES.has(data.status)) {
+        clearInterval(interval);
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [id, loadOutputs]);
+
+  const tabVersions = outputs
+    .filter((o) => o.type === activeTab)
+    .sort((a, b) => b.version - a.version);
+  const latestVersion = tabVersions[0]?.version ?? 1;
+  const currentVersion = viewingVersions[activeTab] ?? latestVersion;
+  const activeOutput = tabVersions.find((o) => o.version === currentVersion) ?? tabVersions[0];
+
+  function switchTab(tab: Output["type"]) {
+    setActiveTab(tab);
+    setRefineOpen(false);
+    setRefineInstruction("");
+  }
+
+  const handleRegenerate = useCallback(async (instruction?: string) => {
+    setRegenerating(true);
+    setRefineOpen(false);
+    try {
+      const res = await fetch(`/api/jobs/${id}/regenerate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format: activeTab, instruction }),
+      });
+      if (res.ok) {
+        const { content, version } = await res.json() as { content: string; version: number };
+        const newOutput: Output = {
+          id: crypto.randomUUID(),
+          job_id: id,
+          type: activeTab,
+          content,
+          version,
+          created_at: new Date().toISOString(),
+        };
+        setOutputs((prev) => [...prev, newOutput]);
+        setViewingVersions((prev) => ({ ...prev, [activeTab]: version }));
+        setRefineInstruction("");
+      }
+    } finally {
+      setRegenerating(false);
+    }
+  }, [id, activeTab]);
+
+  async function handleRestore(version: number) {
+    setRestoring(true);
+    try {
+      const res = await fetch(`/api/jobs/${id}/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: activeTab, version }),
+      });
+      if (res.ok) {
+        const { content, version: newVersion } = await res.json() as { content: string; version: number };
+        const newOutput: Output = {
+          id: crypto.randomUUID(),
+          job_id: id,
+          type: activeTab,
+          content,
+          version: newVersion,
+          created_at: new Date().toISOString(),
+        };
+        setOutputs((prev) => [...prev, newOutput]);
+        setViewingVersions((prev) => ({ ...prev, [activeTab]: newVersion }));
+      }
+    } finally {
+      setRestoring(false);
+    }
+  }
 
   async function handleStop() {
     setStopping(true);
@@ -47,178 +297,131 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
     setStopping(false);
   }
 
-  useEffect(() => {
-    async function load() {
-      const supabase = createClient();
-      const { data: jobData } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (jobData) {
-        setJob(jobData);
-
-        if (jobData.status === "completed") {
-          const { data: outputData } = await supabase
-            .from("outputs")
-            .select("*")
-            .eq("job_id", id);
-          setOutputs(outputData ?? []);
-        }
-      }
-      setLoading(false);
-    }
-
-    load();
-
-    // Poll if job is still processing
-    const interval = setInterval(async () => {
-      const supabase = createClient();
-      const { data: jobData } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (jobData) {
-        setJob(jobData);
-        if (jobData.status === "completed") {
-          const { data: outputData } = await supabase
-            .from("outputs")
-            .select("*")
-            .eq("job_id", id);
-          setOutputs(outputData ?? []);
-          clearInterval(interval);
-        } else if (jobData.status === "failed" || jobData.status === "cancelled") {
-          clearInterval(interval);
-        }
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [id]);
-
-  const activeOutput = outputs.find((o) => o.type === activeTab);
+  const wordCount = activeOutput
+    ? activeOutput.content.split(/\s+/).filter(Boolean).length
+    : 0;
 
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
       </div>
     );
   }
 
-  if (!job) {
-    return (
-      <div className="p-8">
-        <p className="text-white/50">Job not found.</p>
-      </div>
-    );
-  }
+  if (!job) return <div className="p-8 text-white/40">Job not found.</div>;
+
+  const isProcessing = !TERMINAL_STATUSES.has(job.status);
 
   return (
-    <div className="p-8 max-w-4xl">
-      <div className="flex items-center gap-3 mb-8">
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-1 text-white/40 hover:text-white transition-colors text-sm"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
+    <div className="p-8 max-w-4xl animate-fade-in-up">
+      {/* Header */}
+      <div className="flex items-start gap-3 mb-8">
+        <Link href="/dashboard" className="flex items-center gap-1 text-white/30 hover:text-white transition-colors text-sm mt-0.5 shrink-0">
+          <ArrowLeft className="w-4 h-4" /> Back
         </Link>
-        <span className="text-white/20">/</span>
-        <h1 className="text-lg font-semibold text-white truncate">
-          {job.title ?? job.source_url ?? "Untitled"}
-        </h1>
-        <span
-          className={`ml-auto text-xs px-2 py-1 rounded-full shrink-0 ${
-            job.status === "completed"
-              ? "bg-green-500/10 text-green-400"
-              : job.status === "failed"
-              ? "bg-red-500/10 text-red-400"
-              : job.status === "cancelled"
-              ? "bg-white/10 text-white/40"
-              : "bg-yellow-500/10 text-yellow-400"
-          }`}
-        >
-          {job.status}
-        </span>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg font-semibold text-white truncate">
+            {job.title ?? job.source_url ?? "Untitled"}
+          </h1>
+          {job.source_url && (
+            <a href={job.source_url} target="_blank" rel="noopener noreferrer" className="text-xs text-white/30 hover:text-violet-400 transition-colors truncate block mt-0.5">
+              {job.source_url}
+            </a>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {job.tone && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-white/40 border border-white/8">
+              {TONE_LABELS[job.tone] ?? job.tone}
+            </span>
+          )}
+          {job.language === "English" ? null : (
+            job.language && (
+              <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-white/40 border border-white/8">
+                🌐 {job.language}
+              </span>
+            )
+          )}
+          {job.seo_mode && (
+            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              SEO
+            </span>
+          )}
+          <span className={`text-xs px-2.5 py-1 rounded-full ${getStatusBadge(job.status)}`}>
+            {job.status}
+          </span>
+        </div>
       </div>
 
-      {/* Processing state */}
-      {(job.status === "pending" || job.status === "transcribing" || job.status === "generating") && (
-        <div className="glass rounded-2xl p-12 text-center">
-          <Loader2 className="w-10 h-10 text-purple-400 animate-spin mx-auto mb-4" />
-          <p className="text-white font-semibold">
-            {job.status === "transcribing" ? "Fetching transcript..." : "Generating content..."}
+      {/* Processing */}
+      {isProcessing && (
+        <div className="glass rounded-2xl p-12 text-center mb-6">
+          <div className="relative w-14 h-14 mx-auto mb-5">
+            <div className="absolute inset-0 rounded-full border-2 border-violet-500/20" />
+            <div className="absolute inset-0 rounded-full border-2 border-t-violet-500 animate-spin" />
+            <div className="absolute inset-2 rounded-full bg-violet-900/30 flex items-center justify-center">
+              <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
+            </div>
+          </div>
+          <p className="text-white font-semibold text-lg mb-1">
+            {job.status === "transcribing" ? "Fetching transcript…" : "Generating content…"}
           </p>
-          <p className="text-white/40 text-sm mt-2">This usually takes 15-30 seconds</p>
+          <p className="text-white/30 text-sm mb-6">
+            {job.status === "transcribing" ? "Reading the video captions" : "Writing your blog, thread, LinkedIn post & newsletter"}
+          </p>
           <button
             onClick={handleStop}
             disabled={stopping}
-            className="mt-6 flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 text-white/50 hover:text-red-400 text-sm transition-all mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/20 text-white/40 hover:text-red-400 text-sm transition-all disabled:opacity-40"
           >
             <Square className="w-3.5 h-3.5" />
-            {stopping ? "Stopping..." : "Stop job"}
+            {stopping ? "Stopping…" : "Stop job"}
           </button>
         </div>
       )}
 
-      {/* Cancelled state */}
+      {/* Failed */}
+      {job.status === "failed" && (
+        <div className="glass rounded-2xl p-8 border border-red-500/15 mb-6">
+          <p className="text-red-300 font-semibold mb-2">Processing failed</p>
+          {job.error_message && (
+            <p className="text-red-400/60 text-xs font-mono bg-red-500/5 rounded-lg px-3 py-2 mb-3 break-all">
+              {job.error_message}
+            </p>
+          )}
+          <p className="text-white/40 text-sm mb-4">This can happen if the video has no captions or is age-restricted.</p>
+          <Link href="/new" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/8 text-white text-sm hover:bg-white/12 transition-colors">
+            Try another video
+          </Link>
+        </div>
+      )}
+
+      {/* Cancelled */}
       {job.status === "cancelled" && (
-        <div className="glass rounded-2xl p-8 border border-white/10">
-          <p className="text-white/60 font-semibold mb-2">Job cancelled</p>
-          <p className="text-white/30 text-sm">The processing was stopped before it completed.</p>
-          <Link
-            href="/new"
-            className="inline-block mt-4 px-4 py-2 rounded-xl bg-white/10 text-white text-sm hover:bg-white/20 transition-colors"
-          >
+        <div className="glass rounded-2xl p-8 border border-white/8 mb-6">
+          <p className="text-white/50 font-semibold mb-1">Job cancelled</p>
+          <p className="text-white/25 text-sm mb-4">Processing was stopped before it completed.</p>
+          <Link href="/new" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/8 text-white text-sm hover:bg-white/12 transition-colors">
             Start a new job
           </Link>
         </div>
       )}
 
-      {/* Failed state */}
-      {job.status === "failed" && (
-        <div className="glass rounded-2xl p-8 border border-red-500/20">
-          <p className="text-red-300 font-semibold mb-2">Processing failed</p>
-          {job.error_message && (
-            <p className="text-red-400/70 text-xs font-mono bg-red-500/5 rounded-lg px-3 py-2 mb-3 break-all">
-              {job.error_message}
-            </p>
-          )}
-          <p className="text-white/50 text-sm">
-            This can happen if the video doesn&apos;t have captions or is age-restricted. Try another video.
-          </p>
-          <Link
-            href="/new"
-            className="inline-block mt-4 px-4 py-2 rounded-xl bg-white/10 text-white text-sm hover:bg-white/20 transition-colors"
-          >
-            Try again
-          </Link>
-        </div>
-      )}
-
-      {/* Completed state */}
+      {/* Completed outputs */}
       {job.status === "completed" && outputs.length > 0 && (
         <div>
           {/* Tabs */}
-          <div className="flex gap-2 mb-6 flex-wrap">
-            {OUTPUT_TABS.map((tab) => {
-              const hasOutput = outputs.some((o) => o.type === tab.type);
+          <div className="flex gap-1.5 mb-5 p-1 glass rounded-xl w-fit">
+            {TABS.map((tab) => {
+              const has    = outputs.some((o) => o.type === tab.type);
+              const active = activeTab === tab.type;
               return (
                 <button
                   key={tab.type}
-                  onClick={() => setActiveTab(tab.type)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    activeTab === tab.type
-                      ? "bg-purple-600 text-white"
-                      : hasOutput
-                      ? "glass text-white/70 hover:text-white"
-                      : "glass text-white/30 cursor-not-allowed"
-                  }`}
-                  disabled={!hasOutput}
+                  onClick={() => switchTab(tab.type)}
+                  disabled={!has}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${getTabClass(active, has)}`}
                 >
                   <tab.icon className="w-3.5 h-3.5" />
                   {tab.label}
@@ -227,19 +430,97 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
             })}
           </div>
 
-          {/* Output content */}
+          {/* Content card */}
           {activeOutput && (
             <div className="glass rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
-                <span className="text-sm text-white/50">
-                  {OUTPUT_TABS.find((t) => t.type === activeTab)?.label}
-                </span>
-                <CopyButton text={activeOutput.content} />
+              <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/5">
+                <span className="text-xs text-white/30">{wordCount.toLocaleString()} words</span>
+                <div className="flex items-center gap-2">
+                  {activeTab !== "extras" && (
+                    <>
+                      <VersionPicker
+                        versions={tabVersions}
+                        currentVersion={currentVersion}
+                        onSelect={(v) => setViewingVersions((prev) => ({ ...prev, [activeTab]: v }))}
+                        onRestore={handleRestore}
+                        restoring={restoring}
+                      />
+                      <button
+                        onClick={() => setRefineOpen((v) => !v)}
+                        disabled={regenerating}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all disabled:opacity-40 ${
+                          refineOpen
+                            ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+                            : "glass text-white/50 hover:text-white hover:bg-white/5"
+                        }`}
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Refine
+                      </button>
+                      <button
+                        onClick={() => void handleRegenerate()}
+                        disabled={regenerating}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/50 hover:text-white text-xs transition-all hover:bg-white/5 disabled:opacity-40"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
+                        {regenerating ? "Generating…" : "Regenerate"}
+                      </button>
+                    </>
+                  )}
+                  <CopyButton text={activeOutput.content} />
+                  <DownloadButton text={activeOutput.content} filename={`${activeTab}-${id.slice(0, 8)}.md`} />
+                </div>
               </div>
-              <div className="p-6">
-                <pre className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed font-sans">
-                  {activeOutput.content}
-                </pre>
+
+              {refineOpen && activeTab !== "extras" && (
+                <div className="flex items-center gap-2 px-6 py-3 border-b border-white/5 bg-violet-500/5">
+                  <input
+                    type="text"
+                    value={refineInstruction}
+                    onChange={(e) => setRefineInstruction(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && refineInstruction.trim()) void handleRegenerate(refineInstruction); }}
+                    placeholder="e.g. make it shorter, add more examples, focus on beginners…"
+                    className="flex-1 text-sm bg-transparent text-white placeholder-white/25 focus:outline-none"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => void handleRegenerate(refineInstruction)}
+                    disabled={!refineInstruction.trim()}
+                    className="px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium hover:bg-violet-500 transition-all disabled:opacity-40"
+                  >
+                    Apply
+                  </button>
+                  <button onClick={() => setRefineOpen(false)} className="text-white/30 hover:text-white transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              <div className={`p-7 overflow-auto max-h-[65vh] transition-opacity ${regenerating || restoring ? "opacity-40 pointer-events-none" : ""}`}>
+                {job.seo_mode && activeTab === "blog" && (() => {
+                  const seo = parseSeoMeta(activeOutput.content);
+                  return seo ? (
+                    <div className="mb-5 p-4 rounded-xl bg-emerald-500/8 border border-emerald-500/20 space-y-2">
+                      <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">SEO</span>
+                      <div>
+                        <p className="text-xs text-white/40">Focus keyword</p>
+                        <p className="text-sm text-white/80 font-medium">{seo.keyword}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-white/40">Meta description ({seo.metaDesc.length} chars)</p>
+                        <p className="text-sm text-white/70">{seo.metaDesc}</p>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+                {activeTab === "twitter_thread" ? (
+                  <TwitterThreadView content={activeOutput.content} />
+                ) : (
+                  <div className="prose-dark">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {activeOutput.content}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </div>
             </div>
           )}

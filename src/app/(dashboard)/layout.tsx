@@ -1,101 +1,140 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Zap, LayoutDashboard, PlusCircle, History, Settings, LogOut } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { Zap, LayoutDashboard, PlusCircle, History, LogOut, TrendingUp, SlidersHorizontal, Settings, Mic2, Rss } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/new", icon: PlusCircle, label: "New Content" },
   { href: "/history", icon: History, label: "History" },
+  { href: "/feeds", icon: Rss, label: "RSS Feeds" },
+  { href: "/prompts", icon: SlidersHorizontal, label: "Custom Prompts" },
+  { href: "/brand-voice", icon: Mic2, label: "Brand Voice" },
+  { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+interface Profile {
+  plan: string;
+  full_name: string | null;
+  email: string | null;
+}
 
-  if (!user) {
-    redirect("/login");
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { window.location.href = "/login"; return; }
+      setUserEmail(user.email ?? null);
+      const { data } = await supabase
+        .from("users")
+        .select("plan, full_name, email")
+        .eq("id", user.id)
+        .single();
+      if (data) setProfile(data);
+    }
+    load();
+  }, []);
+
+  const initial = ((profile?.full_name ?? profile?.email ?? userEmail ?? "U")[0] ?? "U").toUpperCase();
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = "/";
   }
-
-  const { data: profile } = await supabase
-    .from("users")
-    .select("plan, full_name, email")
-    .eq("id", user.id)
-    .single();
 
   return (
     <div className="flex h-screen" style={{ background: "var(--background)" }}>
       {/* Sidebar */}
-      <aside className="w-60 flex flex-col glass border-r border-white/5">
+      <aside className="w-56 flex flex-col border-r border-white/5 shrink-0" style={{ background: "var(--surface)" }}>
+        {/* Logo */}
         <div className="p-5 border-b border-white/5">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center">
+          <Link href="/dashboard" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-900/50">
               <Zap className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-white">RecastAI</span>
+            <span className="font-bold text-white tracking-tight">RecastAI</span>
           </Link>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/60 hover:text-white hover:bg-white/5 transition-all text-sm"
-            >
-              <item.icon className="w-4 h-4" />
-              {item.label}
-            </Link>
-          ))}
+        {/* Nav */}
+        <nav className="flex-1 p-3 space-y-0.5">
+          {navItems.map((item) => {
+            const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  active
+                    ? "bg-violet-600/20 text-violet-300 border border-violet-500/20"
+                    : "text-white/40 hover:text-white/80 hover:bg-white/5"
+                }`}
+              >
+                <item.icon className={`w-4 h-4 shrink-0 ${active ? "text-violet-400" : ""}`} />
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
-        <div className="p-4 border-t border-white/5">
+        {/* Bottom */}
+        <div className="p-3 border-t border-white/5 space-y-2">
           {/* Plan badge */}
-          <div className="px-3 py-2 rounded-xl bg-white/5 mb-3">
+          <div className="px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-white/40">Current plan</span>
-              <span className="text-xs font-semibold text-purple-400 uppercase">
+              <span className="text-xs text-white/30">Plan</span>
+              <span className={`text-xs font-semibold uppercase tracking-wide ${
+                profile?.plan === "pro" ? "text-amber-400" :
+                profile?.plan === "starter" ? "text-violet-400" : "text-white/40"
+              }`}>
                 {profile?.plan ?? "free"}
               </span>
             </div>
-            {(profile?.plan === "free" || !profile?.plan) && (
+            {(!profile?.plan || profile.plan === "free") && (
               <Link
                 href="/upgrade"
-                className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 transition-colors"
               >
-                Upgrade →
+                <TrendingUp className="w-3 h-3" />
+                Upgrade for more
               </Link>
             )}
           </div>
 
-          {/* User info */}
-          <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold text-white">
-              {(profile?.full_name ?? profile?.email ?? "U")[0].toUpperCase()}
+          {/* User */}
+          <div className="flex items-center gap-2.5 px-2 py-1.5">
+            <div className="w-7 h-7 rounded-full bg-violet-700 flex items-center justify-center text-xs font-bold text-white shrink-0">
+              {initial}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white truncate">
+              <p className="text-xs font-medium text-white/80 truncate">
                 {profile?.full_name ?? "User"}
               </p>
-              <p className="text-xs text-white/40 truncate">{profile?.email ?? user.email}</p>
+              <p className="text-xs text-white/30 truncate">{profile?.email ?? userEmail}</p>
             </div>
           </div>
 
-          <form action="/api/auth/logout" method="POST">
-            <button className="flex items-center gap-2 px-3 py-2 text-xs text-white/40 hover:text-white transition-colors w-full">
-              <LogOut className="w-3.5 h-3.5" />
-              Sign out
-            </button>
-          </form>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-3 py-2 text-xs text-white/30 hover:text-white/70 transition-colors w-full rounded-xl hover:bg-white/5"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sign out
+          </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      {/* Main */}
+      <main className="flex-1 overflow-y-auto bg-grid">{children}</main>
     </div>
   );
 }
