@@ -55,6 +55,7 @@ export interface Output {
   job_id: string
   type: OutputType
   content: string
+  version: number
   created_at: string
 }
 
