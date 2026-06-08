@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Zap, LayoutDashboard, PlusCircle, History, LogOut, TrendingUp, SlidersHorizontal, Settings, Mic2 } from "lucide-react";
+import { Zap, LayoutDashboard, PlusCircle, History, LogOut, TrendingUp, SlidersHorizontal, Settings, Mic2, Rss } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/new", icon: PlusCircle, label: "New Content" },
   { href: "/history", icon: History, label: "History" },
+  { href: "/feeds", icon: Rss, label: "RSS Feeds" },
   { href: "/prompts", icon: SlidersHorizontal, label: "Custom Prompts" },
   { href: "/brand-voice", icon: Mic2, label: "Brand Voice" },
   { href: "/settings", icon: Settings, label: "Settings" },
