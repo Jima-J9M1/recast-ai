@@ -52,11 +52,11 @@ export async function generateAndSave(
 
   await supabase.from("jobs").update({ title }).eq("id", jobId);
   await supabase.from("outputs").insert([
-    { job_id: jobId, type: "blog",           content: blog },
-    { job_id: jobId, type: "twitter_thread", content: twitter },
-    { job_id: jobId, type: "linkedin",       content: linkedin },
-    { job_id: jobId, type: "newsletter",     content: newsletter },
-    { job_id: jobId, type: "extras",         content: extras },
+    { job_id: jobId, type: "blog",           content: blog,       version: 1 },
+    { job_id: jobId, type: "twitter_thread", content: twitter,    version: 1 },
+    { job_id: jobId, type: "linkedin",       content: linkedin,   version: 1 },
+    { job_id: jobId, type: "newsletter",     content: newsletter, version: 1 },
+    { job_id: jobId, type: "extras",         content: extras,     version: 1 },
   ]);
   await supabase.from("jobs").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", jobId);
   await supabase.rpc("increment_usage", { p_user_id: userId, p_month: currentMonth });
