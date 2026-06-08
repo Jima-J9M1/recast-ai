@@ -84,3 +84,28 @@ export const PLAN_PRICES = {
   starter: { monthly: 19, label: 'Starter' },
   pro: { monthly: 49, label: 'Pro' },
 }
+
+export const BATCH_LIMITS: Record<Plan, number> = {
+  free: 0,
+  starter: 5,
+  pro: 20,
+}
+
+export const FEED_LIMITS: Record<Plan, number> = {
+  free: 0,
+  starter: 1,
+  pro: 5,
+}
+
+export interface Feed {
+  id: string
+  user_id: string
+  channel_id: string
+  rss_url: string
+  last_video_id: string | null
+  tone: ToneStyle
+  language: string
+  seo_mode: boolean
+  active: boolean
+  created_at: string
+}

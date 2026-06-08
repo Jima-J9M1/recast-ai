@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Zap, FileText, Hash, Briefcase, Mail, ArrowRight, Globe, Mic, Upload } from "lucide-react";
+import { Loader2, Zap, FileText, Hash, Briefcase, Mail, ArrowRight, Globe, Mic, Upload, Layers } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { PLAN_LIMITS, LANGUAGES, type ToneStyle, type Language, type Plan } from "@/types";
+import { PLAN_LIMITS, BATCH_LIMITS, LANGUAGES, type ToneStyle, type Language, type Plan } from "@/types";
 
 const OUTPUT_TYPES = [
   { icon: FileText, label: "Blog Post",       desc: "SEO-optimized long-form article" },
@@ -22,13 +22,16 @@ const TONES: { value: ToneStyle; label: string; emoji: string; desc: string }[] 
   { value: "humorous",     label: "Humorous",     emoji: "😄", desc: "Witty & playful" },
 ];
 
+type InputMode = "youtube" | "audio" | "batch";
+
 const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+const YT_PATTERN = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/;
 
 function isYouTubeUrl(url: string): boolean {
-  return /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/.test(url);
+  return YT_PATTERN.test(url);
 }
 
-async function loadUserCredits(userId: string): Promise<number | null> {
+async function loadUserData(userId: string): Promise<{ creditsLeft: number | null; plan: Plan }> {
   const supabase = createClient();
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [{ data: profile }, { data: usage }] = await Promise.all([
@@ -37,8 +40,8 @@ async function loadUserCredits(userId: string): Promise<number | null> {
   ]);
   const plan = (profile?.plan ?? "free") as Plan;
   const limit = PLAN_LIMITS[plan];
-  if (limit === null) return null;
-  return Math.max(0, limit - (usage?.count ?? 0));
+  const creditsLeft = limit === null ? null : Math.max(0, limit - (usage?.count ?? 0));
+  return { creditsLeft, plan };
 }
 
 async function submitYouTubeJob(url: string, tone: ToneStyle, language: Language, seoMode: boolean): Promise<string> {
@@ -62,6 +65,56 @@ async function submitAudioJob(file: File, tone: ToneStyle, language: Language, s
   const data = await res.json() as { jobId?: string; error?: string };
   if (!res.ok) throw new Error(data.error ?? "Something went wrong");
   return data.jobId ?? "";
+}
+
+async function submitBatchJob(urls: string[], tone: ToneStyle, language: Language, seoMode: boolean): Promise<void> {
+  const res = await fetch("/api/batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ urls, tone, language, seo_mode: seoMode }),
+  });
+  const data = await res.json() as { error?: string };
+  if (!res.ok) throw new Error(data.error ?? "Something went wrong");
+}
+
+interface BatchInputProps {
+  readonly value: string;
+  readonly onChange: (v: string) => void;
+  readonly loading: boolean;
+  readonly parsedCount: number;
+  readonly batchLimit: number;
+}
+
+function BatchInput({ value, onChange, loading, parsedCount, batchLimit }: BatchInputProps) {
+  const locked = batchLimit === 0;
+  return (
+    <div>
+      <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">YouTube URLs</p>
+      {locked ? (
+        <div className="flex flex-col items-center gap-3 py-8 rounded-xl border border-white/8 bg-white/2 text-center">
+          <Layers className="w-6 h-6 text-white/20" />
+          <p className="text-sm text-white/40">Batch processing requires a Starter or Pro plan.</p>
+          <Link href="/upgrade" className="text-xs text-violet-400 hover:text-violet-300 font-semibold transition-colors">
+            Upgrade to Starter — $19/mo →
+          </Link>
+        </div>
+      ) : (
+        <>
+          <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={loading}
+            rows={6}
+            placeholder={"https://youtube.com/watch?v=xxx\nhttps://youtu.be/yyy\nhttps://youtube.com/watch?v=zzz"}
+            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/20 focus:outline-none focus:border-violet-500/60 transition-all disabled:opacity-50 text-sm font-mono resize-none"
+          />
+          <p className="mt-2 text-xs text-white/25">
+            One URL per line · {parsedCount} valid URL{parsedCount === 1 ? "" : "s"} · max {batchLimit} per batch
+          </p>
+        </>
+      )}
+    </div>
+  );
 }
 
 interface ToneSelectorProps {
@@ -145,7 +198,7 @@ function AudioDropZone({ file, inputRef, onChange, onOpen, loading }: AudioDropZ
         onChange={onChange}
         disabled={loading}
       />
-      {file && !tooLarge && (
+      {file && file.size <= MAX_AUDIO_BYTES && (
         <p className="mt-2 text-xs text-white/25">Audio will be transcribed with Whisper, then 5 formats generated.</p>
       )}
     </div>
@@ -208,26 +261,42 @@ function OutputPreview() {
   );
 }
 
+const SUBTITLES: Record<InputMode, string> = {
+  youtube: "Paste a YouTube URL — we'll generate 5 content formats in ~30s.",
+  audio: "Upload an audio file — we'll transcribe and generate 5 content formats.",
+  batch: "Paste multiple YouTube URLs — we'll process them all in the background.",
+};
+
+const SUBMIT_LABELS: Record<InputMode, string> = {
+  youtube: "Submitting job...",
+  audio: "Transcribing…",
+  batch: "Queueing batch…",
+};
+
 export default function NewPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [inputMode, setInputMode] = useState<"youtube" | "audio">("youtube");
+  const [inputMode, setInputMode] = useState<InputMode>("youtube");
   const [url, setUrl] = useState("");
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [batchUrls, setBatchUrls] = useState("");
   const [tone, setTone] = useState<ToneStyle>("professional");
   const [language, setLanguage] = useState<Language>("English");
   const [seoMode, setSeoMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [creditsLeft, setCreditsLeft] = useState<number | null>(null);
+  const [userPlan, setUserPlan] = useState<Plan>("free");
 
   useEffect(() => {
     async function init() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      setCreditsLeft(await loadUserCredits(user.id));
+      const { creditsLeft: cl, plan } = await loadUserData(user.id);
+      setCreditsLeft(cl);
+      setUserPlan(plan);
     }
     void init();
   }, []);
@@ -240,6 +309,15 @@ export default function NewPage() {
   function handleSubmit() {
     setLoading(true);
     setError("");
+    if (inputMode === "batch") {
+      submitBatchJob(parsedBatchUrls, tone, language, seoMode)
+        .then(() => router.push("/history"))
+        .catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : "Something went wrong");
+          setLoading(false);
+        });
+      return;
+    }
     const job = inputMode === "youtube"
       ? submitYouTubeJob(url, tone, language, seoMode)
       : submitAudioJob(audioFile!, tone, language, seoMode);
@@ -251,22 +329,23 @@ export default function NewPage() {
       });
   }
 
-  const isYouTube = inputMode === "youtube";
-  const fileTooLarge = audioFile !== null && audioFile.size > MAX_AUDIO_BYTES;
-  const canSubmit = isYouTube ? isYouTubeUrl(url) : audioFile !== null && !fileTooLarge;
+  const batchLimit = BATCH_LIMITS[userPlan];
+  const parsedBatchUrls = batchUrls.split("\n").map((s) => s.trim()).filter(isYouTubeUrl);
   const selectedLang = LANGUAGES.find((l) => l.code === language);
-  const ytTabClass = isYouTube ? "bg-violet-600 text-white shadow" : "text-white/40 hover:text-white/70";
+  const ytTabClass = inputMode === "youtube" ? "bg-violet-600 text-white shadow" : "text-white/40 hover:text-white/70";
   const audioTabClass = inputMode === "audio" ? "bg-violet-600 text-white shadow" : "text-white/40 hover:text-white/70";
-  const subtitle = isYouTube
-    ? "Paste a YouTube URL — we'll generate 5 content formats in ~30s."
-    : "Upload an audio file — we'll transcribe and generate 5 content formats.";
-  const submitLabel = inputMode === "audio" ? "Transcribing…" : "Submitting job...";
+  const batchTabClass = inputMode === "batch" ? "bg-violet-600 text-white shadow" : "text-white/40 hover:text-white/70";
+
+  let canSubmit = false;
+  if (inputMode === "batch") canSubmit = parsedBatchUrls.length > 0 && batchLimit > 0;
+  else if (inputMode === "youtube") canSubmit = isYouTubeUrl(url);
+  else canSubmit = audioFile !== null && audioFile.size <= MAX_AUDIO_BYTES;
 
   return (
     <div className="p-8 max-w-2xl animate-fade-in-up">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">New content</h1>
-        <p className="text-white/40 mt-1">{subtitle}</p>
+        <p className="text-white/40 mt-1">{SUBTITLES[inputMode]}</p>
       </div>
 
       {creditsLeft === 1 && (
@@ -291,7 +370,7 @@ export default function NewPage() {
             <div className="w-4 h-4 rounded bg-red-600 flex items-center justify-center shrink-0">
               <div className="w-0 h-0 border-t-[3px] border-t-transparent border-b-[3px] border-b-transparent border-l-[5px] border-l-white ml-px" />
             </div>
-            YouTube URL
+            YouTube
           </button>
           <button
             type="button"
@@ -299,12 +378,20 @@ export default function NewPage() {
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${audioTabClass}`}
           >
             <Mic className="w-4 h-4" />
-            Audio File
+            Audio
+          </button>
+          <button
+            type="button"
+            onClick={() => { setInputMode("batch"); setError(""); }}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${batchTabClass}`}
+          >
+            <Layers className="w-4 h-4" />
+            Batch
           </button>
         </div>
 
         <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-6">
-          {isYouTube ? (
+          {inputMode === "youtube" && (
             <div>
               <label htmlFor="youtube-url" className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">
                 YouTube URL
@@ -327,13 +414,23 @@ export default function NewPage() {
               </div>
               <p className="mt-2 text-xs text-white/25">Requires a video with auto-generated or manual captions.</p>
             </div>
-          ) : (
+          )}
+          {inputMode === "audio" && (
             <AudioDropZone
               file={audioFile}
               inputRef={fileInputRef}
               onChange={handleFileChange}
               onOpen={() => fileInputRef.current?.click()}
               loading={loading}
+            />
+          )}
+          {inputMode === "batch" && (
+            <BatchInput
+              value={batchUrls}
+              onChange={setBatchUrls}
+              loading={loading}
+              parsedCount={parsedBatchUrls.length}
+              batchLimit={batchLimit}
             />
           )}
 
@@ -373,7 +470,7 @@ export default function NewPage() {
             className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-500 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-violet-900/30"
           >
             {loading ? (
-              <><Loader2 className="w-5 h-5 animate-spin" /> {submitLabel}</>
+              <><Loader2 className="w-5 h-5 animate-spin" /> {SUBMIT_LABELS[inputMode]}</>
             ) : (
               <><Zap className="w-5 h-5" /> Generate content</>
             )}
