@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState, useCallback } from "react";
-import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers } from "lucide-react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -9,32 +9,32 @@ import { createClient } from "@/lib/supabase/client";
 import type { Job, Output } from "@/types";
 
 const TABS = [
-  { type: "blog" as const, icon: FileText, label: "Blog Post" },
-  { type: "twitter_thread" as const, icon: Hash, label: "Twitter" },
-  { type: "linkedin" as const, icon: Briefcase, label: "LinkedIn" },
-  { type: "newsletter" as const, icon: Mail, label: "Newsletter" },
-  { type: "extras" as const, icon: Layers, label: "Extras" },
+  { type: "blog" as const,           icon: FileText,  label: "Blog Post"  },
+  { type: "twitter_thread" as const, icon: Hash,      label: "Twitter"    },
+  { type: "linkedin" as const,       icon: Briefcase, label: "LinkedIn"   },
+  { type: "newsletter" as const,     icon: Mail,      label: "Newsletter" },
+  { type: "extras" as const,         icon: Layers,    label: "Extras"     },
 ];
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
 const TONE_LABELS: Record<string, string> = {
   professional: "💼 Professional",
-  casual: "☕ Casual",
+  casual:       "☕ Casual",
   storytelling: "📖 Storytelling",
-  educational: "🎓 Educational",
-  humorous: "😄 Humorous",
+  educational:  "🎓 Educational",
+  humorous:     "😄 Humorous",
 };
 
 function getTabClass(active: boolean, has: boolean): string {
   if (active) return "bg-violet-600 text-white shadow-lg shadow-violet-900/40";
-  if (has) return "text-white/50 hover:text-white hover:bg-white/5";
+  if (has)    return "text-white/50 hover:text-white hover:bg-white/5";
   return "text-white/20 cursor-not-allowed";
 }
 
 function getStatusBadge(status: string) {
   if (status === "completed") return "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-  if (status === "failed") return "bg-red-500/10 text-red-400 border border-red-500/20";
+  if (status === "failed")    return "bg-red-500/10 text-red-400 border border-red-500/20";
   if (status === "cancelled") return "bg-white/5 text-white/30 border border-white/10";
   return "bg-amber-500/10 text-amber-400 border border-amber-500/20";
 }
@@ -55,34 +55,27 @@ function CopyButton({ text }: Readonly<{ text: string }>) {
 }
 
 function parseTweets(content: string): string[] {
-  // Try splitting on blank lines — each tweet block starts with "N/"
   const blocks = content.split(/\n\n+/).map((b) => b.trim()).filter(Boolean);
   const numbered = blocks.filter((b) => /^\d+\//.test(b));
   if (numbered.length >= 2) return numbered;
-  // Fallback: split inline on the numbering pattern
   return content.split(/(?=\n\d+\/)/).map((t) => t.trim()).filter(Boolean);
 }
 
 function TwitterThreadView({ content }: Readonly<{ content: string }>) {
   const tweets = parseTweets(content);
   if (tweets.length < 2) {
-    return (
-      <pre className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed font-sans">
-        {content}
-      </pre>
-    );
+    return <pre className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed font-sans">{content}</pre>;
   }
   return (
     <div className="space-y-3">
       {tweets.map((tweet) => {
-        const charCount = tweet.length;
-        const over = charCount > 280;
+        const over = tweet.length > 280;
         return (
           <div key={tweet.slice(0, 40)} className="rounded-xl bg-white/2.5 border border-white/6 p-4">
             <p className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed">{tweet}</p>
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
               <span className={`text-xs tabular-nums ${over ? "text-red-400" : "text-white/25"}`}>
-                {charCount} / 280{over ? " · over limit" : ""}
+                {tweet.length} / 280{over ? " · over limit" : ""}
               </span>
               <CopyButton text={tweet} />
             </div>
@@ -94,7 +87,7 @@ function TwitterThreadView({ content }: Readonly<{ content: string }>) {
 }
 
 function parseSeoMeta(content: string): { keyword: string; metaDesc: string } | null {
-  const kwMatch = /^\*\*SEO keyword:\*\*\s*(.+)/m.exec(content);
+  const kwMatch   = /^\*\*SEO keyword:\*\*\s*(.+)/m.exec(content);
   const metaMatch = /^\*\*Meta description:\*\*\s*(.+)/m.exec(content);
   if (!kwMatch || !metaMatch) return null;
   return { keyword: kwMatch[1].trim(), metaDesc: metaMatch[1].trim() };
@@ -115,47 +108,99 @@ function DownloadButton({ text, filename }: Readonly<{ text: string; filename: s
   );
 }
 
+interface VersionPickerProps {
+  readonly versions: Output[];
+  readonly currentVersion: number;
+  readonly onSelect: (v: number) => void;
+  readonly onRestore: (v: number) => void;
+  readonly restoring: boolean;
+}
+
+function VersionPicker({ versions, currentVersion, onSelect, onRestore, restoring }: VersionPickerProps) {
+  const [open, setOpen] = useState(false);
+  const latestVersion = Math.max(...versions.map((v) => v.version));
+  const isLatest = currentVersion === latestVersion;
+
+  if (versions.length <= 1) return null;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
+          open ? "bg-violet-600/20 text-violet-300 border border-violet-500/30" : "glass text-white/50 hover:text-white hover:bg-white/5"
+        }`}
+      >
+        <History className="w-3.5 h-3.5" />
+        v{currentVersion}
+        {!isLatest && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 z-20 w-52 glass rounded-xl border border-white/10 shadow-xl overflow-hidden">
+          <p className="text-xs text-white/30 px-3 pt-3 pb-1.5 font-medium uppercase tracking-wider">Version history</p>
+          {[...versions].sort((a, b) => b.version - a.version).map((v) => {
+            const isViewing  = v.version === currentVersion;
+            const isNewest   = v.version === latestVersion;
+            return (
+              <div
+                key={v.version}
+                className={`flex items-center justify-between px-3 py-2.5 hover:bg-white/5 transition-colors ${isViewing ? "bg-violet-600/10" : ""}`}
+              >
+                <button
+                  onClick={() => { onSelect(v.version); setOpen(false); }}
+                  className="flex items-center gap-2 text-sm text-left flex-1 min-w-0"
+                >
+                  <span className={`font-medium ${isViewing ? "text-violet-300" : "text-white/70"}`}>
+                    v{v.version}
+                  </span>
+                  {isNewest && <span className="text-xs text-white/30">latest</span>}
+                  {isViewing && !isNewest && <span className="text-xs text-amber-400">viewing</span>}
+                </button>
+                {!isNewest && (
+                  <button
+                    onClick={() => { onRestore(v.version); setOpen(false); }}
+                    disabled={restoring}
+                    className="flex items-center gap-1 text-xs text-white/30 hover:text-violet-300 transition-colors disabled:opacity-40 shrink-0"
+                    title="Restore this version"
+                  >
+                    <RotateCcw className="w-3 h-3" /> Restore
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function JobPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = use(params);
-  const [job, setJob] = useState<Job | null>(null);
-  const [outputs, setOutputs] = useState<Output[]>([]);
+  const [job, setJob]           = useState<Job | null>(null);
+  const [outputs, setOutputs]   = useState<Output[]>([]);
   const [activeTab, setActiveTab] = useState<Output["type"]>("blog");
-  const [loading, setLoading] = useState(true);
+  const [viewingVersions, setViewingVersions] = useState<Partial<Record<string, number>>>({});
+  const [loading, setLoading]   = useState(true);
   const [stopping, setStopping] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
-  const [refineOpen, setRefineOpen] = useState(false);
+  const [restoring, setRestoring]       = useState(false);
+  const [refineOpen, setRefineOpen]     = useState(false);
   const [refineInstruction, setRefineInstruction] = useState("");
-
-  const handleRegenerate = useCallback(async (instruction?: string) => {
-    setRegenerating(true);
-    setRefineOpen(false);
-    try {
-      const res = await fetch(`/api/jobs/${id}/regenerate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ format: activeTab, instruction }),
-      });
-      if (res.ok) {
-        const { content } = await res.json() as { content: string };
-        setOutputs((prev) =>
-          prev.map((o) => (o.type === activeTab ? { ...o, content } : o))
-        );
-        setRefineInstruction("");
-      }
-    } finally {
-      setRegenerating(false);
-    }
-  }, [id, activeTab]);
 
   const loadOutputs = useCallback(async (jobId: string) => {
     const supabase = createClient();
-    const { data } = await supabase.from("outputs").select("*").eq("job_id", jobId);
+    const { data } = await supabase
+      .from("outputs")
+      .select("*")
+      .eq("job_id", jobId)
+      .order("version", { ascending: true });
     setOutputs(data ?? []);
   }, []);
 
   useEffect(() => {
     const supabase = createClient();
-
     async function init() {
       const { data } = await supabase.from("jobs").select("*").eq("id", id).single();
       if (data) {
@@ -164,9 +209,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
       }
       setLoading(false);
     }
-
     init();
-
     const interval = setInterval(async () => {
       const { data } = await supabase.from("jobs").select("*").eq("id", id).single();
       if (!data) return;
@@ -178,9 +221,75 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
         clearInterval(interval);
       }
     }, 3000);
-
     return () => clearInterval(interval);
   }, [id, loadOutputs]);
+
+  const tabVersions = outputs
+    .filter((o) => o.type === activeTab)
+    .sort((a, b) => b.version - a.version);
+  const latestVersion = tabVersions[0]?.version ?? 1;
+  const currentVersion = viewingVersions[activeTab] ?? latestVersion;
+  const activeOutput = tabVersions.find((o) => o.version === currentVersion) ?? tabVersions[0];
+
+  function switchTab(tab: Output["type"]) {
+    setActiveTab(tab);
+    setRefineOpen(false);
+    setRefineInstruction("");
+  }
+
+  const handleRegenerate = useCallback(async (instruction?: string) => {
+    setRegenerating(true);
+    setRefineOpen(false);
+    try {
+      const res = await fetch(`/api/jobs/${id}/regenerate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format: activeTab, instruction }),
+      });
+      if (res.ok) {
+        const { content, version } = await res.json() as { content: string; version: number };
+        const newOutput: Output = {
+          id: crypto.randomUUID(),
+          job_id: id,
+          type: activeTab,
+          content,
+          version,
+          created_at: new Date().toISOString(),
+        };
+        setOutputs((prev) => [...prev, newOutput]);
+        setViewingVersions((prev) => ({ ...prev, [activeTab]: version }));
+        setRefineInstruction("");
+      }
+    } finally {
+      setRegenerating(false);
+    }
+  }, [id, activeTab]);
+
+  async function handleRestore(version: number) {
+    setRestoring(true);
+    try {
+      const res = await fetch(`/api/jobs/${id}/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: activeTab, version }),
+      });
+      if (res.ok) {
+        const { content, version: newVersion } = await res.json() as { content: string; version: number };
+        const newOutput: Output = {
+          id: crypto.randomUUID(),
+          job_id: id,
+          type: activeTab,
+          content,
+          version: newVersion,
+          created_at: new Date().toISOString(),
+        };
+        setOutputs((prev) => [...prev, newOutput]);
+        setViewingVersions((prev) => ({ ...prev, [activeTab]: newVersion }));
+      }
+    } finally {
+      setRestoring(false);
+    }
+  }
 
   async function handleStop() {
     setStopping(true);
@@ -188,8 +297,9 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
     setStopping(false);
   }
 
-  const activeOutput = outputs.find((o) => o.type === activeTab);
-  const wordCount = activeOutput ? activeOutput.content.split(/\s+/).filter(Boolean).length : 0;
+  const wordCount = activeOutput
+    ? activeOutput.content.split(/\s+/).filter(Boolean).length
+    : 0;
 
   if (loading) {
     return (
@@ -199,9 +309,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
     );
   }
 
-  if (!job) {
-    return <div className="p-8 text-white/40">Job not found.</div>;
-  }
+  if (!job) return <div className="p-8 text-white/40">Job not found.</div>;
 
   const isProcessing = !TERMINAL_STATUSES.has(job.status);
 
@@ -228,7 +336,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
               {TONE_LABELS[job.tone] ?? job.tone}
             </span>
           )}
-          {job.language && job.language === "English" ? null : (
+          {job.language === "English" ? null : (
             job.language && (
               <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-white/40 border border-white/8">
                 🌐 {job.language}
@@ -306,12 +414,12 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
           {/* Tabs */}
           <div className="flex gap-1.5 mb-5 p-1 glass rounded-xl w-fit">
             {TABS.map((tab) => {
-              const has = outputs.some((o) => o.type === tab.type);
+              const has    = outputs.some((o) => o.type === tab.type);
               const active = activeTab === tab.type;
               return (
                 <button
                   key={tab.type}
-                  onClick={() => setActiveTab(tab.type)}
+                  onClick={() => switchTab(tab.type)}
                   disabled={!has}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${getTabClass(active, has)}`}
                 >
@@ -330,6 +438,13 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                 <div className="flex items-center gap-2">
                   {activeTab !== "extras" && (
                     <>
+                      <VersionPicker
+                        versions={tabVersions}
+                        currentVersion={currentVersion}
+                        onSelect={(v) => setViewingVersions((prev) => ({ ...prev, [activeTab]: v }))}
+                        onRestore={handleRestore}
+                        restoring={restoring}
+                      />
                       <button
                         onClick={() => setRefineOpen((v) => !v)}
                         disabled={regenerating}
@@ -342,7 +457,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                         <Sparkles className="w-3.5 h-3.5" /> Refine
                       </button>
                       <button
-                        onClick={() => handleRegenerate()}
+                        onClick={() => void handleRegenerate()}
                         disabled={regenerating}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/50 hover:text-white text-xs transition-all hover:bg-white/5 disabled:opacity-40"
                       >
@@ -352,10 +467,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                     </>
                   )}
                   <CopyButton text={activeOutput.content} />
-                  <DownloadButton
-                    text={activeOutput.content}
-                    filename={`${activeTab}-${id.slice(0, 8)}.md`}
-                  />
+                  <DownloadButton text={activeOutput.content} filename={`${activeTab}-${id.slice(0, 8)}.md`} />
                 </div>
               </div>
 
@@ -365,13 +477,13 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                     type="text"
                     value={refineInstruction}
                     onChange={(e) => setRefineInstruction(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && refineInstruction.trim()) handleRegenerate(refineInstruction); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" && refineInstruction.trim()) void handleRegenerate(refineInstruction); }}
                     placeholder="e.g. make it shorter, add more examples, focus on beginners…"
                     className="flex-1 text-sm bg-transparent text-white placeholder-white/25 focus:outline-none"
                     autoFocus
                   />
                   <button
-                    onClick={() => handleRegenerate(refineInstruction)}
+                    onClick={() => void handleRegenerate(refineInstruction)}
                     disabled={!refineInstruction.trim()}
                     className="px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium hover:bg-violet-500 transition-all disabled:opacity-40"
                   >
@@ -383,14 +495,12 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                 </div>
               )}
 
-              <div className={`p-7 overflow-auto max-h-[65vh] transition-opacity ${regenerating ? "opacity-40 pointer-events-none" : ""}`}>
+              <div className={`p-7 overflow-auto max-h-[65vh] transition-opacity ${regenerating || restoring ? "opacity-40 pointer-events-none" : ""}`}>
                 {job.seo_mode && activeTab === "blog" && (() => {
                   const seo = parseSeoMeta(activeOutput.content);
                   return seo ? (
                     <div className="mb-5 p-4 rounded-xl bg-emerald-500/8 border border-emerald-500/20 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">SEO</span>
-                      </div>
+                      <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">SEO</span>
                       <div>
                         <p className="text-xs text-white/40">Focus keyword</p>
                         <p className="text-sm text-white/80 font-medium">{seo.keyword}</p>

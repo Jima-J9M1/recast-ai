@@ -58,11 +58,20 @@ export async function POST(
     job.language ?? "English"
   );
 
+  const { data: latest } = await supabase
+    .from("outputs")
+    .select("version")
+    .eq("job_id", id)
+    .eq("type", format)
+    .order("version", { ascending: false })
+    .limit(1)
+    .single();
+
+  const nextVersion = (latest?.version ?? 1) + 1;
+
   await supabase
     .from("outputs")
-    .update({ content })
-    .eq("job_id", id)
-    .eq("type", format);
+    .insert({ job_id: id, type: format, content, version: nextVersion });
 
-  return Response.json({ content });
+  return Response.json({ content, version: nextVersion });
 }
