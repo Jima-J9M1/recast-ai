@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { Check, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createCheckoutUrl, POLAR_PRODUCTS } from "@/lib/polar";
-import { ChangePlanButton } from "@/components/ChangePlanButton";
 
 const plans = [
   {
@@ -15,6 +14,8 @@ const plans = [
       "All 5 content formats",
       "Custom prompts",
       "Version history",
+      "RSS auto-import (1 channel)",
+      "Batch processing (5 URLs)",
       "Email support",
     ],
   },
@@ -46,24 +47,20 @@ export default async function UpgradePage() {
     .eq("id", user.id)
     .single();
 
-  if (profile?.plan === "pro") redirect("/dashboard");
-
-  const currentPlan = profile?.plan ?? "free";
-  const hasActiveSub = !!profile?.polar_subscription_id;
+  // Paying subscribers manage their plan from the billing page
+  if (profile?.polar_subscription_id) redirect("/billing");
+  if (profile?.plan === "pro") redirect("/billing");
 
   let starterUrl = "#";
   let proUrl = "#";
-
-  if (!hasActiveSub) {
-    try {
-      const successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/settings?plan_updated=true`;
-      [starterUrl, proUrl] = await Promise.all([
-        createCheckoutUrl(POLAR_PRODUCTS.starter, user.id, user.email!, successUrl),
-        createCheckoutUrl(POLAR_PRODUCTS.pro, user.id, user.email!, successUrl),
-      ]);
-    } catch {
-      // Polar not configured — show plans without checkout links
-    }
+  try {
+    const successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/settings?plan_updated=true`;
+    [starterUrl, proUrl] = await Promise.all([
+      createCheckoutUrl(POLAR_PRODUCTS.starter, user.id, user.email!, successUrl),
+      createCheckoutUrl(POLAR_PRODUCTS.pro, user.id, user.email!, successUrl),
+    ]);
+  } catch {
+    // Polar not configured — show plans without checkout links
   }
 
   return (
@@ -73,17 +70,9 @@ export default async function UpgradePage() {
         <p className="text-white/50 mt-1">Unlock more videos and premium features</p>
       </div>
 
-      {hasActiveSub && (
-        <div className="mb-6 px-4 py-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-sm text-violet-300">
-          You have an active subscription. Clicking &ldquo;Upgrade&rdquo; will switch your plan immediately — no new checkout needed.
-        </div>
-      )}
-
       <div className="grid md:grid-cols-2 gap-6">
         {plans.map((plan) => {
-          const isCurrent = currentPlan === plan.key;
           const checkoutUrl = plan.key === "starter" ? starterUrl : proUrl;
-
           return (
             <div
               key={plan.name}
@@ -111,38 +100,17 @@ export default async function UpgradePage() {
                   </li>
                 ))}
               </ul>
-
-              {(() => {
-                if (isCurrent) {
-                  return (
-                    <div className="w-full py-3 rounded-full text-center text-sm font-semibold border border-white/20 text-white/40 cursor-not-allowed">
-                      Current plan
-                    </div>
-                  );
-                }
-                if (hasActiveSub) {
-                  return (
-                    <ChangePlanButton
-                      targetPlan={plan.key}
-                      label={`Upgrade to ${plan.name}`}
-                      highlight={plan.highlight}
-                    />
-                  );
-                }
-                return (
-                  <a
-                    href={checkoutUrl}
-                    className={`w-full py-3 rounded-full text-center text-sm font-semibold transition-all block ${
-                      plan.highlight
-                        ? "bg-purple-600 text-white hover:bg-purple-500"
-                        : "border border-white/20 text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <Zap className="w-4 h-4 inline mr-1" />
-                    Upgrade to {plan.name}
-                  </a>
-                );
-              })()}
+              <a
+                href={checkoutUrl}
+                className={`w-full py-3 rounded-full text-center text-sm font-semibold transition-all block ${
+                  plan.highlight
+                    ? "bg-purple-600 text-white hover:bg-purple-500"
+                    : "border border-white/20 text-white hover:bg-white/10"
+                }`}
+              >
+                <Zap className="w-4 h-4 inline mr-1" />
+                Get {plan.name}
+              </a>
             </div>
           );
         })}
