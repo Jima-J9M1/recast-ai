@@ -7,23 +7,34 @@ export function ManageSubscriptionButton() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleClick() {
+  function handleClick() {
     setLoading(true);
     setError("");
-    const res = await fetch("/api/portal", { method: "POST" });
-    const json = await res.json() as { url?: string; error?: string };
-    setLoading(false);
-    if (!res.ok || !json.url) {
-      setError(json.error ?? "Could not open billing portal.");
-      return;
-    }
-    window.location.href = json.url;
+    fetch("/api/portal", { method: "POST" })
+      .then((r) => r.json() as Promise<{ url?: string; fallbackUrl?: string; error?: string }>)
+      .then((json) => {
+        if (json.url) {
+          globalThis.location.href = json.url;
+          return;
+        }
+        if (json.fallbackUrl) {
+          globalThis.open(json.fallbackUrl, "_blank", "noopener,noreferrer");
+          setLoading(false);
+          return;
+        }
+        setError(json.error ?? "Could not open billing portal.");
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Network error — please try again.");
+        setLoading(false);
+      });
   }
 
   return (
     <div>
       <button
-        onClick={() => void handleClick()}
+        onClick={handleClick}
         disabled={loading}
         className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/8 border border-white/8 hover:border-white/15 text-white text-sm font-semibold transition-all disabled:opacity-40"
       >
