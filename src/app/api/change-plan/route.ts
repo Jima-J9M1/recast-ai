@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { polar, POLAR_PRODUCTS } from "@/lib/polar";
 
 const VALID_PLANS = new Set(["starter", "pro"] as const);
@@ -36,10 +37,18 @@ export async function POST(request: NextRequest) {
       id: profile.polar_subscription_id,
       subscriptionUpdate: { productId: POLAR_PRODUCTS[targetPlan] },
     });
-    return Response.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[change-plan] Polar subscriptions.update failed:", message);
     return Response.json({ error: `Could not change plan: ${message}` }, { status: 500 });
   }
+
+  // Update the plan in DB directly — don't wait for the webhook which may be slow or misconfigured
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  await admin.from("users").update({ plan: targetPlan }).eq("id", user.id);
+
+  return Response.json({ success: true, plan: targetPlan });
 }
