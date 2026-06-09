@@ -1,6 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { polar } from "@/lib/polar";
 
+const POLAR_DASHBOARD =
+  process.env.POLAR_SERVER === "production"
+    ? "https://polar.sh"
+    : "https://sandbox.polar.sh";
+
 export async function POST() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -27,6 +32,17 @@ export async function POST() {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[portal] Polar customerSessions.create failed:", message);
+
+    // Polar returns 401 when the access token lacks customer_sessions:write scope.
+    // Fall back to a direct Polar dashboard link so the user can still manage their sub.
+    const isAuthError = message.toLowerCase().includes("unauthorized") || message.includes("401");
+    if (isAuthError) {
+      return Response.json({
+        fallbackUrl: `${POLAR_DASHBOARD}/purchases`,
+        error: "Direct portal unavailable — your Polar access token needs the customer_sessions:write scope. Opening Polar dashboard instead.",
+      }, { status: 200 });
+    }
+
     return Response.json({ error: `Billing portal error: ${message}` }, { status: 500 });
   }
 }
