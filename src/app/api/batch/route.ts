@@ -2,6 +2,7 @@ import { NextRequest, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateAndSave } from "@/lib/processor";
 import { BATCH_LIMITS, PLAN_LIMITS, LANGUAGES, type ToneStyle, type Language, type Plan } from "@/types";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rateLimit";
 
 const VALID_TONES = new Set<ToneStyle>([
   "professional", "casual", "storytelling", "educational", "humorous",
@@ -55,6 +56,9 @@ export async function POST(request: NextRequest) {
       { status: 429 }
     );
   }
+
+  const { allowed } = await checkRateLimit(user.id, "batch", 3, 60);
+  if (!allowed) return rateLimitResponse();
 
   const toProcess = urls.slice(0, Math.min(batchLimit, remainingCredits));
 
