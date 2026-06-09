@@ -141,6 +141,122 @@ export async function generateExtras(transcript: string): Promise<string> {
   return response.choices[0].message.content ?? '';
 }
 
+// ── Reverse repurposing: text → video content ──────────────────────────────
+
+const REVERSE_PROMPTS = {
+  video_script: `You are a professional YouTube scriptwriter. Transform the following text into a complete, ready-to-record YouTube video script.
+
+Tone: {tone}
+
+Structure the script as:
+- [HOOK] — First 30 seconds, grab attention immediately
+- [INTRO] — Brief overview of what the video covers
+- [SECTION 1], [SECTION 2], etc. — Main content with talking points
+- [OUTRO] — Recap, CTA, subscribe ask
+
+Include estimated speaking time for each section. Total target: 8-12 minutes of content.
+
+Source text:
+{text}
+
+Write the full script in Markdown.`,
+
+  video_hooks: `You are a short-form video strategist. Based on the following content, create 3 distinct hooks for short-form videos (TikTok, Instagram Reels, YouTube Shorts).
+
+Tone: {tone}
+
+For each hook provide:
+- An opening line (punchy, max 15 words — this is the first thing viewers hear)
+- A 60-second video outline (3-5 talking points, one sentence each)
+- A suggested on-screen text overlay
+
+Format exactly as:
+### Hook 1: [Title]
+**Opening:** ...
+**Outline:**
+1. ...
+2. ...
+**On-screen text:** ...
+
+Source text:
+{text}`,
+
+  thumbnail_ideas: `You are a YouTube growth expert and thumbnail designer. Based on the following content, generate 3 thumbnail concepts that would get high click-through rates.
+
+For each concept provide:
+- Headline text — the bold overlay text on the thumbnail (max 6 words, punchy)
+- Visual concept — what the image/background shows
+- Curiosity trigger — the psychological hook that makes viewers click
+
+Format exactly as:
+### Concept 1
+**Text:** ...
+**Visual:** ...
+**Why it clicks:** ...
+
+Source text:
+{text}`,
+
+  tweet_thread: `Convert the following content into a viral Twitter/X thread.
+
+Tone: {tone}
+
+Requirements:
+- Start with a powerful hook tweet that makes people stop scrolling
+- 8-12 numbered tweets (1/, 2/, etc.)
+- Each tweet max 280 characters
+- Use line breaks for readability
+- End with a call-to-action tweet
+
+Source text:
+{text}
+
+Write the full thread.`,
+} as const;
+
+export type ReverseFormat = keyof typeof REVERSE_PROMPTS;
+
+const REVERSE_MAX_TOKENS: Record<ReverseFormat, number> = {
+  video_script: 1500,
+  video_hooks: 800,
+  thumbnail_ideas: 600,
+  tweet_thread: 700,
+};
+
+const TEXT_LIMIT = 5000;
+
+export async function generateReverseContent(
+  text: string,
+  format: ReverseFormat,
+  tone: ToneStyle = "professional",
+  language = "English"
+): Promise<string> {
+  const toneInstructions: Record<ToneStyle, string> = {
+    professional: "professional and authoritative",
+    casual: "friendly and conversational",
+    storytelling: "narrative-driven with personal angles",
+    educational: "clear and teachable with analogies",
+    humorous: "witty and light with clever observations",
+  };
+
+  const languageNote = language === "English"
+    ? ""
+    : `\n\nIMPORTANT: Write the entire output in ${language}.`;
+
+  const prompt = REVERSE_PROMPTS[format]
+    .replace("{tone}", toneInstructions[tone])
+    .replace("{text}", text.slice(0, TEXT_LIMIT)) + languageNote;
+
+  const response = await openai.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: REVERSE_MAX_TOKENS[format],
+    temperature: 0.7,
+  });
+
+  return response.choices[0].message.content ?? "";
+}
+
 export async function generateTitle(transcript: string): Promise<string> {
   const response = await openai.chat.completions.create({
     model: 'llama-3.1-8b-instant',

@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState, useCallback } from "react";
-import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw } from "lucide-react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw, Save } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -186,8 +186,11 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   const [stopping, setStopping] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [restoring, setRestoring]       = useState(false);
-  const [refineOpen, setRefineOpen]     = useState(false);
+  const [refineOpen, setRefineOpen]         = useState(false);
   const [refineInstruction, setRefineInstruction] = useState("");
+  const [previewContent, setPreviewContent] = useState<string | null>(null);
+  const [previewing, setPreviewing]         = useState(false);
+  const [saving, setSaving]                 = useState(false);
 
   const loadOutputs = useCallback(async (jobId: string) => {
     const supabase = createClient();
@@ -235,16 +238,69 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
     setActiveTab(tab);
     setRefineOpen(false);
     setRefineInstruction("");
+    setPreviewContent(null);
   }
 
-  const handleRegenerate = useCallback(async (instruction?: string) => {
-    setRegenerating(true);
+  function discardPreview() {
+    setPreviewContent(null);
+    setRefineInstruction("");
+  }
+
+  const handlePreviewRefine = useCallback(async (instruction: string) => {
+    setPreviewing(true);
     setRefineOpen(false);
     try {
       const res = await fetch(`/api/jobs/${id}/regenerate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ format: activeTab, instruction }),
+        body: JSON.stringify({ format: activeTab, instruction, preview: true }),
+      });
+      if (res.ok) {
+        const { content } = await res.json() as { content: string };
+        setPreviewContent(content);
+      }
+    } finally {
+      setPreviewing(false);
+    }
+  }, [id, activeTab]);
+
+  const handleSavePreview = useCallback(async () => {
+    if (!previewContent) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/jobs/${id}/save-output`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format: activeTab, content: previewContent }),
+      });
+      if (res.ok) {
+        const { version } = await res.json() as { version: number };
+        const newOutput: Output = {
+          id: crypto.randomUUID(),
+          job_id: id,
+          type: activeTab,
+          content: previewContent,
+          version,
+          created_at: new Date().toISOString(),
+        };
+        setOutputs((prev) => [...prev, newOutput]);
+        setViewingVersions((prev) => ({ ...prev, [activeTab]: version }));
+        setPreviewContent(null);
+        setRefineInstruction("");
+      }
+    } finally {
+      setSaving(false);
+    }
+  }, [id, activeTab, previewContent]);
+
+  const handleRegenerate = useCallback(async () => {
+    setRegenerating(true);
+    setPreviewContent(null);
+    try {
+      const res = await fetch(`/api/jobs/${id}/regenerate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format: activeTab }),
       });
       if (res.ok) {
         const { content, version } = await res.json() as { content: string; version: number };
@@ -258,7 +314,6 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
         };
         setOutputs((prev) => [...prev, newOutput]);
         setViewingVersions((prev) => ({ ...prev, [activeTab]: version }));
-        setRefineInstruction("");
       }
     } finally {
       setRegenerating(false);
@@ -297,9 +352,8 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
     setStopping(false);
   }
 
-  const wordCount = activeOutput
-    ? activeOutput.content.split(/\s+/).filter(Boolean).length
-    : 0;
+  const displayContent = previewContent ?? activeOutput?.content ?? "";
+  const wordCount = displayContent.split(/\s+/).filter(Boolean).length;
 
   if (loading) {
     return (
@@ -434,60 +488,86 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
           {activeOutput && (
             <div className="glass rounded-2xl overflow-hidden">
               <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/5">
-                <span className="text-xs text-white/30">{wordCount.toLocaleString()} words</span>
                 <div className="flex items-center gap-2">
-                  {activeTab !== "extras" && (
+                  <span className="text-xs text-white/30">{wordCount.toLocaleString()} words</span>
+                  {previewContent !== null && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 font-medium">
+                      Preview
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {previewContent !== null ? (
                     <>
-                      <VersionPicker
-                        versions={tabVersions}
-                        currentVersion={currentVersion}
-                        onSelect={(v) => setViewingVersions((prev) => ({ ...prev, [activeTab]: v }))}
-                        onRestore={handleRestore}
-                        restoring={restoring}
-                      />
                       <button
-                        onClick={() => setRefineOpen((v) => !v)}
-                        disabled={regenerating}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all disabled:opacity-40 ${
-                          refineOpen
-                            ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
-                            : "glass text-white/50 hover:text-white hover:bg-white/5"
-                        }`}
+                        onClick={() => void handleSavePreview()}
+                        disabled={saving}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-semibold hover:bg-violet-500 transition-all disabled:opacity-40"
                       >
-                        <Sparkles className="w-3.5 h-3.5" /> Refine
+                        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        {saving ? "Saving…" : "Save"}
                       </button>
                       <button
-                        onClick={() => void handleRegenerate()}
-                        disabled={regenerating}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/50 hover:text-white text-xs transition-all hover:bg-white/5 disabled:opacity-40"
+                        onClick={discardPreview}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/50 hover:text-red-400 text-xs transition-all hover:bg-red-500/10"
                       >
-                        <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
-                        {regenerating ? "Generating…" : "Regenerate"}
+                        <X className="w-3.5 h-3.5" /> Discard
                       </button>
                     </>
+                  ) : (
+                    activeTab !== "extras" && (
+                      <>
+                        <VersionPicker
+                          versions={tabVersions}
+                          currentVersion={currentVersion}
+                          onSelect={(v) => setViewingVersions((prev) => ({ ...prev, [activeTab]: v }))}
+                          onRestore={handleRestore}
+                          restoring={restoring}
+                        />
+                        <button
+                          onClick={() => setRefineOpen((v) => !v)}
+                          disabled={regenerating || previewing}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all disabled:opacity-40 ${
+                            refineOpen
+                              ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+                              : "glass text-white/50 hover:text-white hover:bg-white/5"
+                          }`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" /> Refine
+                        </button>
+                        <button
+                          onClick={() => void handleRegenerate()}
+                          disabled={regenerating || previewing}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/50 hover:text-white text-xs transition-all hover:bg-white/5 disabled:opacity-40"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
+                          {regenerating ? "Generating…" : "Regenerate"}
+                        </button>
+                      </>
+                    )
                   )}
-                  <CopyButton text={activeOutput.content} />
-                  <DownloadButton text={activeOutput.content} filename={`${activeTab}-${id.slice(0, 8)}.md`} />
+                  <CopyButton text={previewContent ?? activeOutput.content} />
+                  <DownloadButton text={previewContent ?? activeOutput.content} filename={`${activeTab}-${id.slice(0, 8)}.md`} />
                 </div>
               </div>
 
-              {refineOpen && activeTab !== "extras" && (
+              {refineOpen && activeTab !== "extras" && previewContent === null && (
                 <div className="flex items-center gap-2 px-6 py-3 border-b border-white/5 bg-violet-500/5">
                   <input
                     type="text"
                     value={refineInstruction}
                     onChange={(e) => setRefineInstruction(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && refineInstruction.trim()) void handleRegenerate(refineInstruction); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" && refineInstruction.trim()) void handlePreviewRefine(refineInstruction); }}
                     placeholder="e.g. make it shorter, add more examples, focus on beginners…"
                     className="flex-1 text-sm bg-transparent text-white placeholder-white/25 focus:outline-none"
                     autoFocus
                   />
                   <button
-                    onClick={() => void handleRegenerate(refineInstruction)}
-                    disabled={!refineInstruction.trim()}
-                    className="px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium hover:bg-violet-500 transition-all disabled:opacity-40"
+                    onClick={() => void handlePreviewRefine(refineInstruction)}
+                    disabled={!refineInstruction.trim() || previewing}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium hover:bg-violet-500 transition-all disabled:opacity-40"
                   >
-                    Apply
+                    {previewing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</> : "Apply"}
                   </button>
                   <button onClick={() => setRefineOpen(false)} className="text-white/30 hover:text-white transition-colors">
                     <X className="w-4 h-4" />
@@ -495,7 +575,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                 </div>
               )}
 
-              <div className={`p-7 overflow-auto max-h-[65vh] transition-opacity ${regenerating || restoring ? "opacity-40 pointer-events-none" : ""}`}>
+              <div className={`p-7 overflow-auto max-h-[65vh] transition-opacity ${regenerating || restoring || previewing || saving ? "opacity-40 pointer-events-none" : ""}`}>
                 {job.seo_mode && activeTab === "blog" && (() => {
                   const seo = parseSeoMeta(activeOutput.content);
                   return seo ? (
@@ -513,11 +593,11 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                   ) : null;
                 })()}
                 {activeTab === "twitter_thread" ? (
-                  <TwitterThreadView content={activeOutput.content} />
+                  <TwitterThreadView content={previewContent ?? activeOutput.content} />
                 ) : (
                   <div className="prose-dark">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {activeOutput.content}
+                      {previewContent ?? activeOutput.content}
                     </ReactMarkdown>
                   </div>
                 )}

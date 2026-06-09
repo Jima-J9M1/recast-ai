@@ -15,7 +15,7 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await request.json() as { format?: string; instruction?: string };
+  const body = await request.json() as { format?: string; instruction?: string; preview?: boolean };
   const format = body.format as ContentFormat;
   if (!VALID_FORMATS.has(format)) {
     return Response.json({ error: "Invalid format" }, { status: 400 });
@@ -57,6 +57,11 @@ export async function POST(
     customPrompt,
     job.language ?? "English"
   );
+
+  // preview=true: return content without saving (caller will save explicitly)
+  if (body.preview) {
+    return Response.json({ content });
+  }
 
   const { data: latest } = await supabase
     .from("outputs")
