@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Zap, LayoutDashboard, PlusCircle, History, LogOut, TrendingUp, SlidersHorizontal, Settings, Mic2, Rss } from "lucide-react";
+import { Zap, LayoutDashboard, PlusCircle, History, LogOut, TrendingUp, SlidersHorizontal, Settings, Mic2, Rss, CreditCard } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 
@@ -13,6 +13,7 @@ const navItems = [
   { href: "/feeds", icon: Rss, label: "RSS Feeds" },
   { href: "/prompts", icon: SlidersHorizontal, label: "Custom Prompts" },
   { href: "/brand-voice", icon: Mic2, label: "Brand Voice" },
+  { href: "/billing", icon: CreditCard, label: "Billing" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -31,7 +32,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     async function load() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { window.location.href = "/login"; return; }
+      if (!user) { globalThis.location.href = "/login"; return; }
       setUserEmail(user.email ?? null);
       const { data } = await supabase
         .from("users")
@@ -48,7 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    window.location.href = "/";
+    globalThis.location.href = "/";
   }
 
   return (
