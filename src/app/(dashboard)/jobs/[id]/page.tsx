@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState, useCallback, useRef } from "react";
-import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw, Save, MessageSquare, SendHorizonal } from "lucide-react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw, Save, MessageSquare, SendHorizonal, Star, AtSign } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -9,11 +9,12 @@ import { createClient } from "@/lib/supabase/client";
 import type { Job, Output } from "@/types";
 
 const TABS = [
-  { type: "blog" as const,           icon: FileText,  label: "Blog Post"  },
-  { type: "twitter_thread" as const, icon: Hash,      label: "Twitter"    },
-  { type: "linkedin" as const,       icon: Briefcase, label: "LinkedIn"   },
-  { type: "newsletter" as const,     icon: Mail,      label: "Newsletter" },
-  { type: "extras" as const,         icon: Layers,    label: "Extras"     },
+  { type: "blog" as const,           icon: FileText,  label: "Blog Post"     },
+  { type: "twitter_thread" as const, icon: Hash,      label: "Twitter"       },
+  { type: "linkedin" as const,       icon: Briefcase, label: "LinkedIn"      },
+  { type: "newsletter" as const,     icon: Mail,      label: "Newsletter"    },
+  { type: "email_sequence" as const, icon: AtSign,    label: "Email Sequence" },
+  { type: "extras" as const,         icon: Layers,    label: "Extras"        },
 ];
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
@@ -176,6 +177,44 @@ function VersionPicker({ versions, currentVersion, onSelect, onRestore, restorin
   );
 }
 
+// ── Star Button ───────────────────────────────────────────────────────────────
+
+interface StarButtonProps {
+  readonly outputId: string;
+  readonly starred: boolean;
+  readonly onToggle: (id: string, starred: boolean) => void;
+}
+
+function StarButton({ outputId, starred, onToggle }: StarButtonProps) {
+  const [loading, setLoading] = useState(false);
+
+  async function toggle() {
+    setLoading(true);
+    const res = await fetch(`/api/outputs/${outputId}/star`, { method: "POST" });
+    if (res.ok) {
+      const { starred: next } = await res.json() as { starred: boolean };
+      onToggle(outputId, next);
+    }
+    setLoading(false);
+  }
+
+  return (
+    <button
+      onClick={() => void toggle()}
+      disabled={loading}
+      title={starred ? "Remove from library" : "Save to library"}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all disabled:opacity-40 ${
+        starred
+          ? "bg-amber-500/15 text-amber-400 border border-amber-500/25 hover:bg-amber-500/25"
+          : "glass text-white/40 hover:text-amber-400 hover:bg-white/5"
+      }`}
+    >
+      <Star className={`w-3.5 h-3.5 ${starred ? "fill-amber-400" : ""}`} />
+      {starred ? "Saved" : "Save"}
+    </button>
+  );
+}
+
 // ── Chat Panel ────────────────────────────────────────────────────────────────
 
 interface ChatMessage {
@@ -317,6 +356,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   const [previewing, setPreviewing]         = useState(false);
   const [saving, setSaving]                 = useState(false);
   const [showChat, setShowChat]             = useState(false);
+  const [starredIds, setStarredIds]         = useState<Set<string>>(new Set());
 
   const loadOutputs = useCallback(async (jobId: string) => {
     const supabase = createClient();
@@ -325,7 +365,9 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
       .select("*")
       .eq("job_id", jobId)
       .order("version", { ascending: true });
-    setOutputs(data ?? []);
+    const loaded = (data ?? []) as (Output & { starred?: boolean })[];
+    setOutputs(loaded);
+    setStarredIds(new Set(loaded.filter((o) => o.starred).map((o) => o.id)));
   }, []);
 
   useEffect(() => {
@@ -689,6 +731,9 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                   )}
                   <CopyButton text={previewContent ?? activeOutput.content} />
                   <DownloadButton text={previewContent ?? activeOutput.content} filename={`${activeTab}-${id.slice(0, 8)}.md`} />
+                  {previewContent === null && (
+                    <StarButton outputId={activeOutput.id} starred={starredIds.has(activeOutput.id)} onToggle={(id, starred) => setStarredIds((prev) => { const next = new Set(prev); starred ? next.add(id) : next.delete(id); return next; })} />
+                  )}
                 </div>
               </div>
 
