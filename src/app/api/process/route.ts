@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateAndSave } from "@/lib/processor";
 import { PLAN_LIMITS, LANGUAGES, type ToneStyle, type Language } from "@/types";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rateLimit";
+import { getTeamBilling } from "@/lib/team";
 
 const VALID_TONES = new Set<ToneStyle>([
   "professional", "casual", "storytelling", "educational", "humorous",
@@ -68,12 +69,10 @@ export async function POST(request: NextRequest) {
 
   const currentMonth = new Date().toISOString().slice(0, 7);
 
-  const [{ data: profile }, { data: usage }] = await Promise.all([
-    supabase.from("users").select("plan").eq("id", user.id).single(),
-    supabase.from("usage").select("count").eq("user_id", user.id).eq("month", currentMonth).single(),
-  ]);
+  const { billingUserId, plan } = await getTeamBilling(user.id);
+  const { data: usage } = await supabase
+    .from("usage").select("count").eq("user_id", billingUserId).eq("month", currentMonth).single();
 
-  const plan = (profile?.plan ?? "free") as keyof typeof PLAN_LIMITS;
   const limit = PLAN_LIMITS[plan];
   const used = usage?.count ?? 0;
 
@@ -99,7 +98,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Failed to create job" }, { status: 500 });
   }
 
-  after(() => processJob(job.id, url, tone, language, seoMode, user.id, currentMonth));
+  after(() => processJob(job.id, url, tone, language, seoMode, billingUserId, currentMonth));
 
   return Response.json({ jobId: job.id });
 }

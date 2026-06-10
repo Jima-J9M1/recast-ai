@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateReverseContent } from "@/lib/openai";
 import { PLAN_LIMITS, LANGUAGES, type ToneStyle, type Language } from "@/types";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rateLimit";
+import { getTeamBilling } from "@/lib/team";
 
 const VALID_TONES = new Set<ToneStyle>([
   "professional", "casual", "storytelling", "educational", "humorous",
@@ -35,12 +36,10 @@ export async function POST(request: NextRequest) {
 
   // Plan + usage check (counts as 1 credit)
   const currentMonth = new Date().toISOString().slice(0, 7);
-  const [{ data: profile }, { data: usage }] = await Promise.all([
-    supabase.from("users").select("plan").eq("id", user.id).single(),
-    supabase.from("usage").select("count").eq("user_id", user.id).eq("month", currentMonth).single(),
-  ]);
+  const { billingUserId, plan } = await getTeamBilling(user.id);
+  const { data: usage } = await supabase
+    .from("usage").select("count").eq("user_id", billingUserId).eq("month", currentMonth).single();
 
-  const plan = (profile?.plan ?? "free") as keyof typeof PLAN_LIMITS;
   const limit = PLAN_LIMITS[plan];
   const used = usage?.count ?? 0;
 
@@ -60,7 +59,7 @@ export async function POST(request: NextRequest) {
   ]);
 
   // Increment usage
-  await supabase.rpc("increment_usage", { p_user_id: user.id, p_month: currentMonth });
+  await supabase.rpc("increment_usage", { p_user_id: billingUserId, p_month: currentMonth });
 
   return Response.json({ videoScript, videoHooks, thumbnailIdeas, tweetThread });
 }

@@ -1,14 +1,25 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, Crown, UserMinus, Link2, Copy, Check, Plus, Loader2, Trash2 } from "lucide-react";
+import {
+  Users, Crown, UserMinus, Link2, Copy, Check, Plus, Loader2,
+  Trash2, Pencil, X, Clock, BarChart2,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Member {
   user_id: string;
   role: string;
   joined_at: string;
+  jobs_this_month: number;
   users: { email: string | null; full_name: string | null } | null;
+}
+
+interface PendingInvite {
+  id: string;
+  token: string;
+  created_at: string;
+  expires_at: string;
 }
 
 interface Team {
@@ -20,10 +31,12 @@ interface Team {
 interface TeamData {
   team: Team | null;
   members: Member[];
+  pending_invites: PendingInvite[];
   plan: string;
+  seat_limit: number;
 }
 
-function CopyLink({ url }: { url: string }) {
+function CopyLink({ url }: Readonly<{ url: string }>) {
   const [copied, setCopied] = useState(false);
   async function copy() {
     await navigator.clipboard.writeText(url);
@@ -33,26 +46,38 @@ function CopyLink({ url }: { url: string }) {
   return (
     <div className="flex items-center gap-2 p-3 rounded-xl bg-white/5 border border-white/8">
       <p className="flex-1 text-xs text-white/50 truncate font-mono">{url}</p>
-      <button onClick={() => void copy()} className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${copied ? "bg-emerald-600/20 text-emerald-400" : "bg-violet-600 text-white hover:bg-violet-500"}`}>
-        {copied ? <><Check className="w-3.5 h-3.5" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy link</>}
+      <button
+        onClick={() => void copy()}
+        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${copied ? "bg-emerald-600/20 text-emerald-400" : "bg-violet-600 text-white hover:bg-violet-500"}`}
+      >
+        {copied ? <><Check className="w-3.5 h-3.5" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
       </button>
     </div>
   );
 }
 
+function daysUntil(iso: string) {
+  const diff = new Date(iso).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / 86400000));
+}
+
 export default function TeamPage() {
-  const [data, setData]           = useState<TeamData | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [teamName, setTeamName]   = useState("");
-  const [creating, setCreating]   = useState(false);
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
-  const [inviting, setInviting]   = useState(false);
-  const [removing, setRemoving]   = useState<string | null>(null);
-  const [deleting, setDeleting]   = useState(false);
-  const [joinToken, setJoinToken] = useState("");
-  const [joining, setJoining]     = useState(false);
-  const [joinError, setJoinError] = useState("");
-  const [error, setError]         = useState("");
+  const [data, setData]             = useState<TeamData | null>(null);
+  const [loading, setLoading]       = useState(true);
+  const [teamName, setTeamName]     = useState("");
+  const [creating, setCreating]     = useState(false);
+  const [inviteUrl, setInviteUrl]   = useState<string | null>(null);
+  const [inviting, setInviting]     = useState(false);
+  const [removing, setRemoving]     = useState<string | null>(null);
+  const [revoking, setRevoking]     = useState<string | null>(null);
+  const [deleting, setDeleting]     = useState(false);
+  const [joinToken, setJoinToken]   = useState("");
+  const [joining, setJoining]       = useState(false);
+  const [joinError, setJoinError]   = useState("");
+  const [error, setError]           = useState("");
+  const [renaming, setRenaming]     = useState(false);
+  const [renameVal, setRenameVal]   = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   const load = useCallback(async () => {
     const res  = await fetch("/api/team");
@@ -73,6 +98,14 @@ export default function TeamPage() {
     setCreating(false);
   }
 
+  async function saveName() {
+    if (!renameVal.trim()) return;
+    setSavingName(true);
+    const res = await fetch("/api/team", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: renameVal }) });
+    if (res.ok) { await load(); setRenaming(false); }
+    setSavingName(false);
+  }
+
   async function generateInvite() {
     setInviting(true);
     const res  = await fetch("/api/team/invite", { method: "POST" });
@@ -80,7 +113,16 @@ export default function TeamPage() {
     if (res.ok && json.token) {
       setInviteUrl(`${globalThis.location.origin}/join?token=${json.token}`);
     }
+    await load(); // refresh pending invites list
     setInviting(false);
+  }
+
+  async function revokeInvite(inviteId: string) {
+    setRevoking(inviteId);
+    await fetch(`/api/team/invite/${inviteId}`, { method: "DELETE" });
+    await load();
+    setRevoking(null);
+    setInviteUrl(null);
   }
 
   async function removeMember(userId: string) {
@@ -189,28 +231,69 @@ export default function TeamPage() {
     );
   }
 
-  const isOwner = data.members.find((m) => m.user_id && data.team && m.user_id === data.team.owner_id)?.role === "owner";
-  const currentUserId = data.members.find((m) => m.role !== "owner")?.user_id;
-  void currentUserId; // will use Supabase user for leave check
+  const isOwner = data.members.find((m) => m.user_id === data.team?.owner_id)?.role === "owner";
+  const seatCount = data.members.length;
+  const seatLimit = data.seat_limit ?? 10;
 
   return (
-    <div className="p-8 max-w-2xl animate-fade-in-up">
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">{data.team.name}</h1>
-          <p className="text-white/40 mt-1">{data.members.length} member{data.members.length !== 1 ? "s" : ""}</p>
+    <div className="p-8 max-w-2xl animate-fade-in-up space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          {renaming ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={renameVal}
+                onChange={(e) => setRenameVal(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void saveName(); else if (e.key === "Escape") setRenaming(false); }}
+                className="text-2xl font-bold bg-transparent border-b border-violet-500 text-white focus:outline-none w-full"
+              />
+              <button onClick={() => void saveName()} disabled={savingName} className="shrink-0 text-violet-400 hover:text-violet-300 disabled:opacity-40">
+                {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              </button>
+              <button onClick={() => setRenaming(false)} className="shrink-0 text-white/30 hover:text-white/60">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-white truncate">{data.team.name}</h1>
+              {isOwner && (
+                <button
+                  onClick={() => { setRenameVal(data.team?.name ?? ""); setRenaming(true); }}
+                  className="shrink-0 text-white/20 hover:text-white/60 transition-colors"
+                  title="Rename team"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+          <div className="flex items-center gap-3 mt-1">
+            <span className="text-white/40 text-sm">{seatCount}/{seatLimit} seats</span>
+            <span className="w-1 h-1 rounded-full bg-white/20" />
+            <span className="text-xs text-violet-400 font-medium">Pro</span>
+          </div>
         </div>
         {isOwner && (
-          <button onClick={() => void deleteTeam()} disabled={deleting} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs hover:bg-red-500/20 transition-all disabled:opacity-40">
+          <button onClick={() => void deleteTeam()} disabled={deleting} className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs hover:bg-red-500/20 transition-all disabled:opacity-40">
             <Trash2 className="w-3.5 h-3.5" /> {deleting ? "Deleting…" : "Delete team"}
           </button>
         )}
       </div>
 
       {/* Members */}
-      <div className="glass rounded-2xl overflow-hidden mb-5">
-        <p className="text-xs font-semibold text-white/50 uppercase tracking-wider px-5 pt-4 pb-2">Members</p>
-        <div className="divide-y divide-white/[0.04]">
+      <div className="glass rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 pt-4 pb-2">
+          <p className="text-xs font-semibold text-white/50 uppercase tracking-wider">Members</p>
+          <div className="flex items-center gap-1 text-white/30">
+            <BarChart2 className="w-3 h-3" />
+            <span className="text-xs">Jobs this month</span>
+          </div>
+        </div>
+        <div className="divide-y divide-white/4">
           {data.members.map((m) => {
             const name  = m.users?.full_name ?? m.users?.email ?? "Unknown";
             const email = m.users?.email ?? "";
@@ -223,6 +306,7 @@ export default function TeamPage() {
                   <p className="text-sm text-white/80 font-medium truncate">{name}</p>
                   <p className="text-xs text-white/30 truncate">{email}</p>
                 </div>
+                <span className="text-xs text-white/30 shrink-0 mr-2">{m.jobs_this_month} jobs</span>
                 {m.role === "owner"
                   ? <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                   : isOwner && (
@@ -230,6 +314,7 @@ export default function TeamPage() {
                       onClick={() => void removeMember(m.user_id)}
                       disabled={removing === m.user_id}
                       className="shrink-0 p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40"
+                      title="Remove member"
                     >
                       {removing === m.user_id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserMinus className="w-3.5 h-3.5" />}
                     </button>
@@ -241,9 +326,9 @@ export default function TeamPage() {
         </div>
       </div>
 
-      {/* Invite */}
-      {isOwner && (
-        <div className="glass rounded-2xl p-5 mb-5">
+      {/* Invite section (owner only) */}
+      {isOwner && seatCount < seatLimit && (
+        <div className="glass rounded-2xl p-5">
           <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Invite members</p>
           {inviteUrl ? (
             <>
@@ -263,6 +348,34 @@ export default function TeamPage() {
         </div>
       )}
 
+      {/* Pending invites */}
+      {isOwner && data.pending_invites.length > 0 && (
+        <div className="glass rounded-2xl overflow-hidden">
+          <p className="text-xs font-semibold text-white/50 uppercase tracking-wider px-5 pt-4 pb-2">Pending invites</p>
+          <div className="divide-y divide-white/4">
+            {data.pending_invites.map((inv) => (
+              <div key={inv.id} className="flex items-center gap-3 px-5 py-3">
+                <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-white/60 font-mono truncate">{inv.token.slice(0, 18)}…</p>
+                  <p className="text-xs text-white/25">Expires in {daysUntil(inv.expires_at)}d</p>
+                </div>
+                <button
+                  onClick={() => void revokeInvite(inv.id)}
+                  disabled={revoking === inv.id}
+                  className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 text-xs transition-all disabled:opacity-40"
+                >
+                  {revoking === inv.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><X className="w-3 h-3" /> Revoke</>}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Leave team (members only) */}
       {!isOwner && (
         <button onClick={() => void leaveTeam()} className="text-xs text-white/30 hover:text-red-400 transition-colors">
           Leave team
