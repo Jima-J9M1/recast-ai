@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useEffect, useState, useCallback } from "react";
-import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw, Save } from "lucide-react";
+import { use, useEffect, useState, useCallback, useRef } from "react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw, Save, MessageSquare, SendHorizonal } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -176,6 +176,131 @@ function VersionPicker({ versions, currentVersion, onSelect, onRestore, restorin
   );
 }
 
+// ── Chat Panel ────────────────────────────────────────────────────────────────
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+interface ChatPanelProps {
+  readonly jobId: string;
+}
+
+function ChatPanel({ jobId }: ChatPanelProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput]       = useState("");
+  const [sending, setSending]   = useState(false);
+  const bottomRef               = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  async function send() {
+    const text = input.trim();
+    if (!text || sending) return;
+    const userMsg: ChatMessage = { role: "user", content: text };
+    const next = [...messages, userMsg];
+    setMessages(next);
+    setInput("");
+    setSending(true);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: next }),
+      });
+      const data = await res.json() as { reply?: string; error?: string };
+      if (res.ok && data.reply) {
+        setMessages([...next, { role: "assistant", content: data.reply }]);
+      } else {
+        setMessages([...next, { role: "assistant", content: data.error ?? "Something went wrong." }]);
+      }
+    } catch {
+      setMessages([...next, { role: "assistant", content: "Failed to send. Please try again." }]);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="glass rounded-2xl flex flex-col" style={{ height: "65vh" }}>
+      <div className="flex items-center gap-2 px-5 py-3.5 border-b border-white/5 shrink-0">
+        <MessageSquare className="w-4 h-4 text-violet-400" />
+        <span className="text-sm font-medium text-white/70">Chat with transcript</span>
+        <span className="text-xs text-white/25 ml-auto">Ask anything about this content</span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+            <div className="w-12 h-12 rounded-full bg-violet-900/30 flex items-center justify-center">
+              <MessageSquare className="w-5 h-5 text-violet-400/60" />
+            </div>
+            <p className="text-sm text-white/30">Ask anything about the transcript</p>
+            <div className="flex flex-wrap justify-center gap-2 mt-1">
+              {["Summarize the key points", "What are the main takeaways?", "Find the best quotes"].map((hint) => (
+                <button
+                  key={hint}
+                  type="button"
+                  onClick={() => setInput(hint)}
+                  className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/8 text-white/40 hover:text-white/70 hover:bg-white/8 transition-all"
+                >
+                  {hint}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+              msg.role === "user"
+                ? "bg-violet-600 text-white rounded-br-sm"
+                : "bg-white/5 border border-white/8 text-white/80 rounded-bl-sm"
+            }`}>
+              {msg.content}
+            </div>
+          </div>
+        ))}
+
+        {sending && (
+          <div className="flex justify-start">
+            <div className="bg-white/5 border border-white/8 rounded-2xl rounded-bl-sm px-4 py-2.5">
+              <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      <div className="shrink-0 px-4 py-3 border-t border-white/5">
+        <div className="flex items-center gap-2 bg-white/5 rounded-xl border border-white/8 px-4 py-2.5 focus-within:border-violet-500/40 transition-all">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
+            placeholder="Ask about the content…"
+            disabled={sending}
+            className="flex-1 bg-transparent text-sm text-white placeholder-white/25 focus:outline-none disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={() => void send()}
+            disabled={!input.trim() || sending}
+            className="shrink-0 w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center hover:bg-violet-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <SendHorizonal className="w-3.5 h-3.5 text-white" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function JobPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = use(params);
   const [job, setJob]           = useState<Job | null>(null);
@@ -191,6 +316,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [previewing, setPreviewing]         = useState(false);
   const [saving, setSaving]                 = useState(false);
+  const [showChat, setShowChat]             = useState(false);
 
   const loadOutputs = useCallback(async (jobId: string) => {
     const supabase = createClient();
@@ -469,11 +595,11 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
           <div className="flex gap-1.5 mb-5 p-1 glass rounded-xl w-fit">
             {TABS.map((tab) => {
               const has    = outputs.some((o) => o.type === tab.type);
-              const active = activeTab === tab.type;
+              const active = !showChat && activeTab === tab.type;
               return (
                 <button
                   key={tab.type}
-                  onClick={() => switchTab(tab.type)}
+                  onClick={() => { setShowChat(false); switchTab(tab.type); }}
                   disabled={!has}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${getTabClass(active, has)}`}
                 >
@@ -482,10 +608,25 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                 </button>
               );
             })}
+            {job.transcript && (
+              <button
+                onClick={() => setShowChat(true)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  showChat
+                    ? "bg-violet-600 text-white shadow-lg shadow-violet-900/40"
+                    : "text-white/50 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" /> Chat
+              </button>
+            )}
           </div>
 
+          {/* Chat panel */}
+          {showChat && <ChatPanel jobId={id} />}
+
           {/* Content card */}
-          {activeOutput && (
+          {!showChat && activeOutput && (
             <div className="glass rounded-2xl overflow-hidden">
               <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/5">
                 <div className="flex items-center gap-2">
