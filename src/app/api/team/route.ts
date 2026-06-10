@@ -12,7 +12,7 @@ export async function GET() {
     .eq("id", user.id)
     .single();
 
-  if (!profile?.team_id) return Response.json({ team: null });
+  if (!profile?.team_id) return Response.json({ team: null, members: [], plan: profile?.plan ?? "free" });
 
   const [{ data: team }, { data: members }] = await Promise.all([
     supabase.from("teams").select("id, name, owner_id").eq("id", profile.team_id).single(),
