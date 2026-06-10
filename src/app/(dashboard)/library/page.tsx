@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Star, FileText, Hash, Briefcase, Mail, Layers, Copy, Check, ExternalLink, AtSign, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import type { OutputType } from "@/types";
 
 interface LibraryOutput {
@@ -58,30 +57,11 @@ export default function LibraryPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data } = await supabase
-      .from("outputs")
-      .select("id, type, content, version, created_at, starred, job_id, jobs(title, source_url)")
-      .eq("starred", true)
-      .eq("jobs.user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    setOutputs(
-      (data ?? []).map((o: Record<string, unknown>) => ({
-        id: o.id as string,
-        type: o.type as OutputType,
-        content: o.content as string,
-        version: o.version as number,
-        created_at: o.created_at as string,
-        starred: o.starred as boolean,
-        job_id: o.job_id as string,
-        job_title: (o.jobs as { title?: string } | null)?.title ?? null,
-        job_source_url: (o.jobs as { source_url?: string } | null)?.source_url ?? null,
-      }))
-    );
+    const res = await fetch("/api/library");
+    if (res.ok) {
+      const json = await res.json() as { outputs: LibraryOutput[] };
+      setOutputs(json.outputs);
+    }
     setLoading(false);
   }, []);
 
