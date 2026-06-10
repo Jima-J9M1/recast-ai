@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   if (new Date(invite.expires_at) < new Date()) return Response.json({ error: "This invite has expired." }, { status: 400 });
 
   await Promise.all([
-    service.from("team_members").insert({ team_id: invite.team_id, user_id: user.id, role: "member" }),
+    service.from("team_members").insert({ team_id: invite.team_id, user_id: user.id, role: "member", joined_at: new Date().toISOString() }),
     service.from("users").update({ team_id: invite.team_id }).eq("id", user.id),
     service.from("team_invites").update({ accepted_at: new Date().toISOString() }).eq("id", invite.id),
   ]);

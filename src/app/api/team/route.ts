@@ -27,7 +27,7 @@ export async function GET() {
   const admin = adminClient();
   const currentMonth = new Date().toISOString().slice(0, 7);
 
-  const [{ data: team }, { data: members }, { data: invites }, { data: usageRows }] = await Promise.all([
+  const [{ data: team }, { data: members }, { data: invites }] = await Promise.all([
     admin.from("teams").select("id, name, owner_id").eq("id", profile.team_id).single(),
     admin.from("team_members").select("user_id, role, joined_at, users(email, full_name)").eq("team_id", profile.team_id),
     admin.from("team_invites")
@@ -36,19 +36,27 @@ export async function GET() {
       .is("accepted_at", null)
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false }),
-    admin.from("usage").select("user_id, count").eq("month", currentMonth),
   ]);
 
-  const memberIds = new Set((members ?? []).map((m: { user_id: string }) => m.user_id));
-  const usageMap = Object.fromEntries(
-    (usageRows ?? [])
-      .filter((u: { user_id: string }) => memberIds.has(u.user_id))
-      .map((u: { user_id: string; count: number }) => [u.user_id, u.count])
-  );
+  const memberIds = (members ?? []).map((m: { user_id: string }) => m.user_id);
+
+  // Count jobs from the jobs table (usage table only tracks owner since billing is pooled)
+  const { data: jobRows } = await admin
+    .from("jobs")
+    .select("user_id")
+    .in("user_id", memberIds)
+    .gte("created_at", `${currentMonth}-01T00:00:00Z`)
+    .neq("status", "cancelled");
+
+  const jobCountMap: Record<string, number> = {};
+  for (const row of jobRows ?? []) {
+    const uid = row.user_id;
+    jobCountMap[uid] = (jobCountMap[uid] ?? 0) + 1;
+  }
 
   const membersWithUsage = (members ?? []).map((m: Record<string, unknown>) => ({
     ...m,
-    jobs_this_month: (usageMap[m.user_id as string] ?? 0) as number,
+    jobs_this_month: jobCountMap[m.user_id as string] ?? 0,
   }));
 
   return Response.json({
