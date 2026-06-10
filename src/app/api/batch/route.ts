@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json() as {
-    urls?: unknown; tone?: string; language?: string; seo_mode?: boolean;
+    urls?: unknown; tone?: string; language?: string; languages?: unknown; seo_mode?: boolean;
   };
 
   const rawUrls = Array.isArray(body.urls) ? body.urls : [];
@@ -27,8 +27,9 @@ export async function POST(request: NextRequest) {
   }
 
   const tone: ToneStyle = VALID_TONES.has(body.tone as ToneStyle) ? (body.tone as ToneStyle) : "professional";
-  const language: Language = VALID_LANGUAGES.has(body.language as Language) ? (body.language as Language) : "English";
+  const primaryLanguage: Language = VALID_LANGUAGES.has(body.language as Language) ? (body.language as Language) : "English";
   const seoMode = body.seo_mode === true;
+
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   const [{ data: profile }, { data: usage }] = await Promise.all([
@@ -46,9 +47,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Multi-language: Pro only. Validate and cap at 3 languages total.
+  const rawLangs = Array.isArray(body.languages) ? body.languages : [primaryLanguage];
+  const requestedLangs: Language[] = rawLangs
+    .filter((l): l is Language => VALID_LANGUAGES.has(l as Language))
+    .slice(0, 3);
+  const effectiveLangs = plan === "pro" && requestedLangs.length > 0 ? requestedLangs : [primaryLanguage];
+
   const monthlyLimit = PLAN_LIMITS[plan];
   const usedCount = usage?.count ?? 0;
-  const remainingCredits = monthlyLimit === null ? urls.length : Math.max(0, monthlyLimit - usedCount);
+  const remainingCredits = monthlyLimit === null ? urls.length * effectiveLangs.length : Math.max(0, monthlyLimit - usedCount);
 
   if (remainingCredits === 0) {
     return Response.json(
@@ -60,10 +68,17 @@ export async function POST(request: NextRequest) {
   const { allowed } = await checkRateLimit(user.id, "batch", 3, 60);
   if (!allowed) return rateLimitResponse();
 
-  const toProcess = urls.slice(0, Math.min(batchLimit, remainingCredits));
+  // Cap URLs so total jobs don't exceed remaining credits
+  const maxUrls = Math.min(batchLimit, Math.floor(remainingCredits / effectiveLangs.length));
+  const toProcess = urls.slice(0, maxUrls);
+
+  // Create one job per URL × language combination
+  const pairs: { url: string; language: Language }[] = toProcess.flatMap((url) =>
+    effectiveLangs.map((lang) => ({ url, language: lang }))
+  );
 
   const results = await Promise.all(
-    toProcess.map((url) =>
+    pairs.map(({ url, language }) =>
       supabase
         .from("jobs")
         .insert({ user_id: user.id, source_type: "youtube", source_url: url.trim(), status: "transcribing", tone, language, seo_mode: seoMode })
@@ -78,22 +93,21 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Failed to create jobs" }, { status: 500 });
   }
 
-  after(() => processBatch(jobIds, toProcess, tone, language, seoMode, user.id, currentMonth));
+  after(() => processBatch(jobIds, pairs, tone, seoMode, user.id, currentMonth));
 
-  return Response.json({ jobIds, queued: jobIds.length, skipped: urls.length - jobIds.length });
+  return Response.json({ jobIds, queued: jobIds.length, skipped: urls.length - toProcess.length });
 }
 
 async function processBatch(
   jobIds: string[],
-  urls: string[],
+  pairs: { url: string; language: Language }[],
   tone: ToneStyle,
-  language: Language,
   seoMode: boolean,
   userId: string,
   currentMonth: string
 ) {
   await Promise.all(
-    jobIds.map((jobId, i) => processOne(jobId, urls[i]!, tone, language, seoMode, userId, currentMonth))
+    jobIds.map((jobId, i) => processOne(jobId, pairs[i].url, tone, pairs[i].language, seoMode, userId, currentMonth))
   );
 }
 

@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Zap, LayoutDashboard, PlusCircle, History, LogOut, TrendingUp, SlidersHorizontal, Settings, Mic2, Rss, CreditCard, Repeat2 } from "lucide-react";
+import { Zap, LayoutDashboard, PlusCircle, History, LogOut, TrendingUp, SlidersHorizontal, Settings, Mic2, Rss, CreditCard, Repeat2, CalendarDays } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/new", icon: PlusCircle, label: "New Content" },
   { href: "/reverse", icon: Repeat2, label: "Reverse" },
   { href: "/history", icon: History, label: "History" },
+  { href: "/calendar", icon: CalendarDays, label: "Calendar" },
   { href: "/feeds", icon: Rss, label: "RSS Feeds" },
   { href: "/prompts", icon: SlidersHorizontal, label: "Custom Prompts" },
   { href: "/brand-voice", icon: Mic2, label: "Brand Voice" },

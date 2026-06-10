@@ -2,16 +2,19 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Zap, FileText, Hash, Briefcase, Mail, ArrowRight, Globe, Mic, Upload, Layers } from "lucide-react";
+import {
+  Loader2, Zap, FileText, Hash, Briefcase, Mail, ArrowRight,
+  Globe, Mic, Upload, Layers, Square, Check, Radio,
+} from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PLAN_LIMITS, BATCH_LIMITS, LANGUAGES, type ToneStyle, type Language, type Plan } from "@/types";
 
 const OUTPUT_TYPES = [
-  { icon: FileText, label: "Blog Post",       desc: "SEO-optimized long-form article" },
-  { icon: Hash,     label: "Twitter Thread",  desc: "Viral-ready thread with hook & CTA" },
-  { icon: Briefcase,label: "LinkedIn Post",   desc: "Professional post built for reach" },
-  { icon: Mail,     label: "Newsletter",      desc: "Ready-to-send email with subject line" },
+  { icon: FileText,  label: "Blog Post",      desc: "SEO-optimized long-form article" },
+  { icon: Hash,      label: "Twitter Thread", desc: "Viral-ready thread with hook & CTA" },
+  { icon: Briefcase, label: "LinkedIn Post",  desc: "Professional post built for reach" },
+  { icon: Mail,      label: "Newsletter",     desc: "Ready-to-send email with subject line" },
 ];
 
 const TONES: { value: ToneStyle; label: string; emoji: string; desc: string }[] = [
@@ -22,7 +25,7 @@ const TONES: { value: ToneStyle; label: string; emoji: string; desc: string }[] 
   { value: "humorous",     label: "Humorous",     emoji: "😄", desc: "Witty & playful" },
 ];
 
-type InputMode = "youtube" | "audio" | "batch";
+type InputMode = "youtube" | "audio" | "voice" | "batch";
 
 const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
 const YT_PATTERN = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/;
@@ -67,15 +70,154 @@ async function submitAudioJob(file: File, tone: ToneStyle, language: Language, s
   return data.jobId ?? "";
 }
 
-async function submitBatchJob(urls: string[], tone: ToneStyle, language: Language, seoMode: boolean): Promise<void> {
+async function submitBatchJob(
+  urls: string[],
+  tone: ToneStyle,
+  language: Language,
+  seoMode: boolean,
+  extraLanguages: Language[]
+): Promise<void> {
+  const languages = extraLanguages.length > 0 ? [language, ...extraLanguages] : [language];
   const res = await fetch("/api/batch", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ urls, tone, language, seo_mode: seoMode }),
+    body: JSON.stringify({ urls, tone, languages, seo_mode: seoMode }),
   });
   const data = await res.json() as { error?: string };
   if (!res.ok) throw new Error(data.error ?? "Something went wrong");
 }
+
+// ── Voice Recorder ────────────────────────────────────────────────────────────
+
+type RecordingState = "idle" | "recording" | "recorded";
+
+function fmtTime(s: number) {
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+interface VoiceRecorderProps {
+  readonly onFileReady: (f: File | null) => void;
+  readonly loading: boolean;
+}
+
+function VoiceRecorder({ onFileReady, loading }: VoiceRecorderProps) {
+  const [recState, setRecState] = useState<RecordingState>("idle");
+  const [seconds, setSeconds]   = useState(0);
+  const [fileSize, setFileSize] = useState(0);
+  const recorderRef             = useRef<MediaRecorder | null>(null);
+  const chunksRef               = useRef<Blob[]>([]);
+  const timerRef                = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function startRecording() {
+    try {
+      const stream   = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      recorderRef.current = recorder;
+      chunksRef.current   = [];
+
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const file = new File([blob], "voice-recording.webm", { type: "audio/webm" });
+        setFileSize(file.size);
+        setRecState("recorded");
+        onFileReady(file);
+        stream.getTracks().forEach((t) => t.stop());
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
+
+      recorder.start();
+      setRecState("recording");
+      setSeconds(0);
+      timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
+    } catch {
+      // Microphone permission denied or unavailable
+    }
+  }
+
+  function stopRecording() { recorderRef.current?.stop(); }
+
+  function reset() {
+    setRecState("idle");
+    setSeconds(0);
+    setFileSize(0);
+    onFileReady(null);
+  }
+
+  if (recState === "recording") {
+    return (
+      <div>
+        <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Voice Recording</p>
+        <div className="flex flex-col items-center gap-4 py-8 rounded-xl border-2 border-red-500/30 bg-red-500/5">
+          <div className="relative">
+            <div className="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center">
+              <Mic className="w-6 h-6 text-white" />
+            </div>
+            <div className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping" />
+          </div>
+          <p className="text-red-300 font-mono text-2xl font-semibold tracking-wider">{fmtTime(seconds)}</p>
+          <button
+            type="button"
+            onClick={stopRecording}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition-all"
+          >
+            <Square className="w-4 h-4" /> Stop recording
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (recState === "recorded") {
+    return (
+      <div>
+        <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Voice Recording</p>
+        <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-5 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-violet-600/30 flex items-center justify-center shrink-0">
+            <Check className="w-5 h-5 text-violet-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-white">Recording ready</p>
+            <p className="text-xs text-white/40 mt-0.5">{fmtTime(seconds)} · {(fileSize / 1024).toFixed(0)} KB</p>
+          </div>
+          <button
+            type="button"
+            onClick={reset}
+            disabled={loading}
+            className="text-xs text-white/30 hover:text-white transition-colors shrink-0"
+          >
+            Re-record
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-white/25">Click &quot;Generate content&quot; below to transcribe and create your content.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Voice Recording</p>
+      <button
+        type="button"
+        onClick={() => void startRecording()}
+        disabled={loading}
+        className="w-full flex flex-col items-center gap-3 py-10 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 hover:bg-violet-500/5 transition-all disabled:opacity-50"
+      >
+        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+          <Mic className="w-6 h-6 text-white/40" />
+        </div>
+        <div className="text-center">
+          <p className="text-sm text-white/60 font-medium">Click to start recording</p>
+          <p className="text-xs text-white/25 mt-1">Speak your ideas — we&apos;ll transcribe and generate 5 formats</p>
+        </div>
+      </button>
+    </div>
+  );
+}
+
+// ── Batch Input ───────────────────────────────────────────────────────────────
+
+const MULTI_LANG_EXTRA_MAX = 2;
 
 interface BatchInputProps {
   readonly value: string;
@@ -83,39 +225,116 @@ interface BatchInputProps {
   readonly loading: boolean;
   readonly parsedCount: number;
   readonly batchLimit: number;
+  readonly plan: Plan;
+  readonly primaryLanguage: Language;
+  readonly extraLanguages: Language[];
+  readonly onExtraLanguagesChange: (langs: Language[]) => void;
 }
 
-function BatchInput({ value, onChange, loading, parsedCount, batchLimit }: BatchInputProps) {
+function BatchInput({
+  value, onChange, loading, parsedCount, batchLimit,
+  plan, primaryLanguage, extraLanguages, onExtraLanguagesChange,
+}: BatchInputProps) {
   const locked = batchLimit === 0;
+  const isPro  = plan === "pro";
+
+  function toggleLang(lang: Language) {
+    if (lang === primaryLanguage) return;
+    if (extraLanguages.includes(lang)) {
+      onExtraLanguagesChange(extraLanguages.filter((l) => l !== lang));
+    } else if (extraLanguages.length < MULTI_LANG_EXTRA_MAX) {
+      onExtraLanguagesChange([...extraLanguages, lang]);
+    }
+  }
+
+  const totalJobs = parsedCount * (1 + extraLanguages.length);
+
   return (
-    <div>
-      <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">YouTube URLs</p>
-      {locked ? (
-        <div className="flex flex-col items-center gap-3 py-8 rounded-xl border border-white/8 bg-white/2 text-center">
-          <Layers className="w-6 h-6 text-white/20" />
-          <p className="text-sm text-white/40">Batch processing requires a Starter or Pro plan.</p>
-          <Link href="/upgrade" className="text-xs text-violet-400 hover:text-violet-300 font-semibold transition-colors">
-            Upgrade to Starter — $19/mo →
-          </Link>
+    <div className="space-y-4">
+      <div>
+        <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">YouTube URLs</p>
+        {locked ? (
+          <div className="flex flex-col items-center gap-3 py-8 rounded-xl border border-white/8 bg-white/2 text-center">
+            <Layers className="w-6 h-6 text-white/20" />
+            <p className="text-sm text-white/40">Batch processing requires a Starter or Pro plan.</p>
+            <Link href="/upgrade" className="text-xs text-violet-400 hover:text-violet-300 font-semibold transition-colors">
+              Upgrade to Starter — $19/mo →
+            </Link>
+          </div>
+        ) : (
+          <>
+            <textarea
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              disabled={loading}
+              rows={6}
+              placeholder={"https://youtube.com/watch?v=xxx\nhttps://youtu.be/yyy\nhttps://youtube.com/watch?v=zzz"}
+              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/20 focus:outline-none focus:border-violet-500/60 transition-all disabled:opacity-50 text-sm font-mono resize-none"
+            />
+            <p className="mt-2 text-xs text-white/25">
+              One URL per line · {parsedCount} valid URL{parsedCount === 1 ? "" : "s"} · max {batchLimit} per batch
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* Multi-language — Pro only */}
+      {!locked && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <p className="text-xs font-semibold text-white/50 uppercase tracking-wider">Multi-language output</p>
+            {isPro
+              ? <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 font-semibold">Pro</span>
+              : <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/5 text-white/30 border border-white/10">Pro only</span>
+            }
+          </div>
+          {isPro ? (
+            <>
+              <div className="grid grid-cols-3 gap-1.5">
+                {LANGUAGES.map((l) => {
+                  const isPrimary = l.code === primaryLanguage;
+                  const selected  = isPrimary || extraLanguages.includes(l.code);
+                  const disabled  = !selected && extraLanguages.length >= MULTI_LANG_EXTRA_MAX;
+                  return (
+                    <button
+                      key={l.code}
+                      type="button"
+                      onClick={() => toggleLang(l.code)}
+                      disabled={disabled || loading || isPrimary}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        isPrimary
+                          ? "bg-violet-600/20 border border-violet-500/30 text-violet-300 cursor-default"
+                          : selected
+                          ? "bg-violet-600/20 border border-violet-500/40 text-violet-200"
+                          : "bg-white/3 border border-white/8 text-white/40 hover:text-white/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                      }`}
+                    >
+                      <span>{l.flag}</span> {l.code}
+                      {isPrimary && <span className="text-white/30 ml-auto">primary</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              {extraLanguages.length > 0 && parsedCount > 0 && (
+                <p className="mt-2 text-xs text-violet-300/70">
+                  {parsedCount} URL{parsedCount !== 1 ? "s" : ""} × {1 + extraLanguages.length} languages = <span className="font-semibold">{totalJobs} jobs</span>
+                </p>
+              )}
+              <p className="mt-1 text-xs text-white/25">Primary language always included. Add up to {MULTI_LANG_EXTRA_MAX} more.</p>
+            </>
+          ) : (
+            <div className="px-3 py-2.5 rounded-xl bg-white/3 border border-white/8 text-xs text-white/30 flex items-center justify-between">
+              Generate the same content in multiple languages at once
+              <Link href="/billing" className="text-violet-400 hover:text-violet-300 font-semibold transition-colors ml-2 shrink-0">Upgrade →</Link>
+            </div>
+          )}
         </div>
-      ) : (
-        <>
-          <textarea
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            disabled={loading}
-            rows={6}
-            placeholder={"https://youtube.com/watch?v=xxx\nhttps://youtu.be/yyy\nhttps://youtube.com/watch?v=zzz"}
-            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/20 focus:outline-none focus:border-violet-500/60 transition-all disabled:opacity-50 text-sm font-mono resize-none"
-          />
-          <p className="mt-2 text-xs text-white/25">
-            One URL per line · {parsedCount} valid URL{parsedCount === 1 ? "" : "s"} · max {batchLimit} per batch
-          </p>
-        </>
       )}
     </div>
   );
 }
+
+// ── Tone Selector ─────────────────────────────────────────────────────────────
 
 interface ToneSelectorProps {
   readonly value: ToneStyle;
@@ -153,6 +372,8 @@ function ToneSelector({ value, onChange, disabled }: ToneSelectorProps) {
   );
 }
 
+// ── Audio Drop Zone ───────────────────────────────────────────────────────────
+
 interface AudioDropZoneProps {
   readonly file: File | null;
   readonly inputRef: React.RefObject<HTMLInputElement | null>;
@@ -162,10 +383,8 @@ interface AudioDropZoneProps {
 }
 
 function AudioDropZone({ file, inputRef, onChange, onOpen, loading }: AudioDropZoneProps) {
-  const tooLarge = file !== null && file.size > MAX_AUDIO_BYTES;
-  const dropClass = file
-    ? "border-violet-500/40 bg-violet-500/5"
-    : "border-white/10 hover:border-white/20 hover:bg-white/3";
+  const tooLarge  = file !== null && file.size > MAX_AUDIO_BYTES;
+  const dropClass = file ? "border-violet-500/40 bg-violet-500/5" : "border-white/10 hover:border-white/20 hover:bg-white/3";
   return (
     <div>
       <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Audio File</p>
@@ -205,6 +424,8 @@ function AudioDropZone({ file, inputRef, onChange, onOpen, loading }: AudioDropZ
   );
 }
 
+// ── SEO Toggle ────────────────────────────────────────────────────────────────
+
 interface SeoToggleProps {
   readonly checked: boolean;
   readonly onToggle: () => void;
@@ -212,9 +433,7 @@ interface SeoToggleProps {
 }
 
 function SeoToggle({ checked, onToggle, disabled }: SeoToggleProps) {
-  const desc = checked
-    ? "Blog will include focus keyword, meta description & FAQ"
-    : "Adds SEO structure to the blog post only";
+  const desc       = checked ? "Blog will include focus keyword, meta description & FAQ" : "Adds SEO structure to the blog post only";
   const trackClass = checked ? "bg-violet-600" : "bg-white/10";
   const thumbClass = checked ? "translate-x-5" : "translate-x-0";
   return (
@@ -235,6 +454,8 @@ function SeoToggle({ checked, onToggle, disabled }: SeoToggleProps) {
     </div>
   );
 }
+
+// ── Output Preview ────────────────────────────────────────────────────────────
 
 function OutputPreview() {
   return (
@@ -261,33 +482,39 @@ function OutputPreview() {
   );
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 const SUBTITLES: Record<InputMode, string> = {
   youtube: "Paste a YouTube URL — we'll generate 5 content formats in ~30s.",
-  audio: "Upload an audio file — we'll transcribe and generate 5 content formats.",
-  batch: "Paste multiple YouTube URLs — we'll process them all in the background.",
+  audio:   "Upload an audio file — we'll transcribe and generate 5 content formats.",
+  voice:   "Record your voice — speak your ideas, we'll transcribe and generate 5 formats.",
+  batch:   "Paste multiple YouTube URLs — we'll process them all in the background.",
 };
 
 const SUBMIT_LABELS: Record<InputMode, string> = {
-  youtube: "Submitting job...",
-  audio: "Transcribing…",
-  batch: "Queueing batch…",
+  youtube: "Submitting job…",
+  audio:   "Transcribing…",
+  voice:   "Transcribing…",
+  batch:   "Queueing batch…",
 };
 
 export default function NewPage() {
-  const router = useRouter();
+  const router       = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [inputMode, setInputMode] = useState<InputMode>("youtube");
-  const [url, setUrl] = useState("");
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [batchUrls, setBatchUrls] = useState("");
-  const [tone, setTone] = useState<ToneStyle>("professional");
-  const [language, setLanguage] = useState<Language>("English");
-  const [seoMode, setSeoMode] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [inputMode, setInputMode]     = useState<InputMode>("youtube");
+  const [url, setUrl]                 = useState("");
+  const [audioFile, setAudioFile]     = useState<File | null>(null);
+  const [voiceFile, setVoiceFile]     = useState<File | null>(null);
+  const [batchUrls, setBatchUrls]     = useState("");
+  const [extraLangs, setExtraLangs]   = useState<Language[]>([]);
+  const [tone, setTone]               = useState<ToneStyle>("professional");
+  const [language, setLanguage]       = useState<Language>("English");
+  const [seoMode, setSeoMode]         = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState("");
   const [creditsLeft, setCreditsLeft] = useState<number | null>(null);
-  const [userPlan, setUserPlan] = useState<Plan>("free");
+  const [userPlan, setUserPlan]       = useState<Plan>("free");
 
   useEffect(() => {
     async function init() {
@@ -301,6 +528,11 @@ export default function NewPage() {
     void init();
   }, []);
 
+  function switchMode(mode: InputMode) {
+    setInputMode(mode);
+    setError("");
+  }
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setAudioFile(e.target.files?.[0] ?? null);
     setError("");
@@ -309,8 +541,9 @@ export default function NewPage() {
   function handleSubmit() {
     setLoading(true);
     setError("");
+
     if (inputMode === "batch") {
-      submitBatchJob(parsedBatchUrls, tone, language, seoMode)
+      submitBatchJob(parsedBatchUrls, tone, language, seoMode, extraLangs)
         .then(() => router.push("/history"))
         .catch((err: unknown) => {
           setError(err instanceof Error ? err.message : "Something went wrong");
@@ -318,9 +551,12 @@ export default function NewPage() {
         });
       return;
     }
+
+    const fileForAudio = inputMode === "voice" ? voiceFile! : audioFile!;
     const job = inputMode === "youtube"
       ? submitYouTubeJob(url, tone, language, seoMode)
-      : submitAudioJob(audioFile!, tone, language, seoMode);
+      : submitAudioJob(fileForAudio, tone, language, seoMode);
+
     job
       .then((jobId) => router.push(`/jobs/${jobId}`))
       .catch((err: unknown) => {
@@ -329,17 +565,21 @@ export default function NewPage() {
       });
   }
 
-  const batchLimit = BATCH_LIMITS[userPlan];
+  const batchLimit      = BATCH_LIMITS[userPlan];
   const parsedBatchUrls = batchUrls.split("\n").map((s) => s.trim()).filter(isYouTubeUrl);
-  const selectedLang = LANGUAGES.find((l) => l.code === language);
-  const ytTabClass = inputMode === "youtube" ? "bg-violet-600 text-white shadow" : "text-white/40 hover:text-white/70";
-  const audioTabClass = inputMode === "audio" ? "bg-violet-600 text-white shadow" : "text-white/40 hover:text-white/70";
-  const batchTabClass = inputMode === "batch" ? "bg-violet-600 text-white shadow" : "text-white/40 hover:text-white/70";
+  const selectedLang    = LANGUAGES.find((l) => l.code === language);
 
   let canSubmit = false;
-  if (inputMode === "batch") canSubmit = parsedBatchUrls.length > 0 && batchLimit > 0;
+  if (inputMode === "batch")        canSubmit = parsedBatchUrls.length > 0 && batchLimit > 0;
   else if (inputMode === "youtube") canSubmit = isYouTubeUrl(url);
-  else canSubmit = audioFile !== null && audioFile.size <= MAX_AUDIO_BYTES;
+  else if (inputMode === "audio")   canSubmit = audioFile !== null && audioFile.size <= MAX_AUDIO_BYTES;
+  else                              canSubmit = voiceFile !== null;
+
+  function tabClass(mode: InputMode) {
+    return inputMode === mode
+      ? "bg-violet-600 text-white shadow"
+      : "text-white/40 hover:text-white/70";
+  }
 
   return (
     <div className="p-8 max-w-2xl animate-fade-in-up">
@@ -361,32 +601,26 @@ export default function NewPage() {
       )}
 
       <div className="glass rounded-2xl p-7 mb-6">
-        <div className="flex gap-1 p-1 glass rounded-xl mb-6">
-          <button
-            type="button"
-            onClick={() => { setInputMode("youtube"); setError(""); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${ytTabClass}`}
-          >
+        {/* Tab bar */}
+        <div className="grid grid-cols-4 gap-1 p-1 glass rounded-xl mb-6">
+          <button type="button" onClick={() => switchMode("youtube")}
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${tabClass("youtube")}`}>
             <div className="w-4 h-4 rounded bg-red-600 flex items-center justify-center shrink-0">
               <div className="w-0 h-0 border-t-[3px] border-t-transparent border-b-[3px] border-b-transparent border-l-[5px] border-l-white ml-px" />
             </div>
             YouTube
           </button>
-          <button
-            type="button"
-            onClick={() => { setInputMode("audio"); setError(""); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${audioTabClass}`}
-          >
-            <Mic className="w-4 h-4" />
-            Audio
+          <button type="button" onClick={() => switchMode("audio")}
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${tabClass("audio")}`}>
+            <Upload className="w-4 h-4" /> Upload
           </button>
-          <button
-            type="button"
-            onClick={() => { setInputMode("batch"); setError(""); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${batchTabClass}`}
-          >
-            <Layers className="w-4 h-4" />
-            Batch
+          <button type="button" onClick={() => switchMode("voice")}
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${tabClass("voice")}`}>
+            <Radio className="w-4 h-4" /> Voice
+          </button>
+          <button type="button" onClick={() => switchMode("batch")}
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${tabClass("batch")}`}>
+            <Layers className="w-4 h-4" /> Batch
           </button>
         </div>
 
@@ -415,6 +649,7 @@ export default function NewPage() {
               <p className="mt-2 text-xs text-white/25">Requires a video with auto-generated or manual captions.</p>
             </div>
           )}
+
           {inputMode === "audio" && (
             <AudioDropZone
               file={audioFile}
@@ -424,6 +659,11 @@ export default function NewPage() {
               loading={loading}
             />
           )}
+
+          {inputMode === "voice" && (
+            <VoiceRecorder onFileReady={setVoiceFile} loading={loading} />
+          )}
+
           {inputMode === "batch" && (
             <BatchInput
               value={batchUrls}
@@ -431,6 +671,10 @@ export default function NewPage() {
               loading={loading}
               parsedCount={parsedBatchUrls.length}
               batchLimit={batchLimit}
+              plan={userPlan}
+              primaryLanguage={language}
+              extraLanguages={extraLangs}
+              onExtraLanguagesChange={setExtraLangs}
             />
           )}
 
@@ -451,7 +695,7 @@ export default function NewPage() {
                 ))}
               </select>
             </div>
-            {language === "English" ? null : (
+            {language !== "English" && (
               <p className="mt-2 text-xs text-violet-300/70">
                 {selectedLang?.flag} All formats will be written in {language}.
               </p>
@@ -469,11 +713,9 @@ export default function NewPage() {
             disabled={loading || !canSubmit}
             className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-500 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-violet-900/30"
           >
-            {loading ? (
-              <><Loader2 className="w-5 h-5 animate-spin" /> {SUBMIT_LABELS[inputMode]}</>
-            ) : (
-              <><Zap className="w-5 h-5" /> Generate content</>
-            )}
+            {loading
+              ? <><Loader2 className="w-5 h-5 animate-spin" /> {SUBMIT_LABELS[inputMode]}</>
+              : <><Zap className="w-5 h-5" /> Generate content</>}
           </button>
         </form>
       </div>
