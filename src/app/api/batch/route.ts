@@ -106,9 +106,10 @@ async function processBatch(
   userId: string,
   currentMonth: string
 ) {
-  await Promise.all(
-    jobIds.map((jobId, i) => processOne(jobId, pairs[i].url, tone, pairs[i].language, seoMode, userId, currentMonth))
-  );
+  // Sequential to avoid Groq rate-limit errors (each job makes ~6 API calls)
+  for (let i = 0; i < jobIds.length; i++) {
+    await processOne(jobIds[i], pairs[i].url, tone, pairs[i].language, seoMode, userId, currentMonth);
+  }
 }
 
 async function processOne(
