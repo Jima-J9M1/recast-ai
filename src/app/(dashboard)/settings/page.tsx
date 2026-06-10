@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PLAN_LIMITS, PLAN_PRICES } from "@/types";
 import { ProfileForm } from "@/components/ProfileForm";
 import { ManageSubscriptionButton } from "@/components/ManageSubscriptionButton";
+import { WebhookSettings } from "@/components/WebhookSettings";
 
 interface UserStats {
   total_jobs: number;
@@ -216,6 +217,9 @@ export default async function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Section 4 — Webhooks */}
+      <WebhookSettings />
     </div>
   );
 }

@@ -2,21 +2,23 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Zap, LayoutDashboard, PlusCircle, History, LogOut, TrendingUp, SlidersHorizontal, Settings, Mic2, Rss, CreditCard, Repeat2, CalendarDays } from "lucide-react";
+import { Zap, LayoutDashboard, PlusCircle, History, LogOut, TrendingUp, SlidersHorizontal, Settings, Mic2, Rss, CreditCard, Repeat2, CalendarDays, Star, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 
 const navItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/new", icon: PlusCircle, label: "New Content" },
-  { href: "/reverse", icon: Repeat2, label: "Reverse" },
-  { href: "/history", icon: History, label: "History" },
-  { href: "/calendar", icon: CalendarDays, label: "Calendar" },
-  { href: "/feeds", icon: Rss, label: "RSS Feeds" },
-  { href: "/prompts", icon: SlidersHorizontal, label: "Custom Prompts" },
-  { href: "/brand-voice", icon: Mic2, label: "Brand Voice" },
-  { href: "/billing", icon: CreditCard, label: "Billing" },
-  { href: "/settings", icon: Settings, label: "Settings" },
+  { href: "/dashboard",   icon: LayoutDashboard,  label: "Dashboard"      },
+  { href: "/new",         icon: PlusCircle,        label: "New Content"    },
+  { href: "/reverse",     icon: Repeat2,           label: "Reverse"        },
+  { href: "/history",     icon: History,           label: "History"        },
+  { href: "/calendar",    icon: CalendarDays,      label: "Calendar"       },
+  { href: "/library",     icon: Star,              label: "Library"        },
+  { href: "/feeds",       icon: Rss,               label: "RSS Feeds"      },
+  { href: "/prompts",     icon: SlidersHorizontal, label: "Custom Prompts" },
+  { href: "/brand-voice", icon: Mic2,              label: "Brand Voice"    },
+  { href: "/team",        icon: Users,             label: "Team"           },
+  { href: "/billing",     icon: CreditCard,        label: "Billing"        },
+  { href: "/settings",    icon: Settings,          label: "Settings"       },
 ];
 
 interface Profile {
@@ -25,9 +27,21 @@ interface Profile {
   email: string | null;
 }
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+async function logout() {
+  const supabase = createClient();
+  await supabase.auth.signOut();
+  globalThis.location.href = "/";
+}
+
+function getPlanClass(plan: string | undefined): string {
+  if (plan === "pro")     return "text-amber-400";
+  if (plan === "starter") return "text-violet-400";
+  return "text-white/40";
+}
+
+export default function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile]     = useState<Profile | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,16 +57,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .single();
       if (data) setProfile(data);
     }
-    load();
+    void load();
   }, []);
 
   const initial = ((profile?.full_name ?? profile?.email ?? userEmail ?? "U")[0] ?? "U").toUpperCase();
-
-  async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    globalThis.location.href = "/";
-  }
 
   return (
     <div className="flex h-screen" style={{ background: "var(--background)" }}>
@@ -69,7 +77,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-3 space-y-0.5">
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
@@ -92,21 +100,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Bottom */}
         <div className="p-3 border-t border-white/5 space-y-2">
           {/* Plan badge */}
-          <div className="px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+          <div className="px-3 py-2.5 rounded-xl bg-white/3 border border-white/5">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-white/30">Plan</span>
-              <span className={`text-xs font-semibold uppercase tracking-wide ${
-                profile?.plan === "pro" ? "text-amber-400" :
-                profile?.plan === "starter" ? "text-violet-400" : "text-white/40"
-              }`}>
+              <span className={`text-xs font-semibold uppercase tracking-wide ${getPlanClass(profile?.plan)}`}>
                 {profile?.plan ?? "free"}
               </span>
             </div>
             {(!profile?.plan || profile.plan === "free") && (
-              <Link
-                href="/upgrade"
-                className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 transition-colors"
-              >
+              <Link href="/upgrade" className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 transition-colors">
                 <TrendingUp className="w-3 h-3" />
                 Upgrade for more
               </Link>
@@ -119,15 +121,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {initial}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white/80 truncate">
-                {profile?.full_name ?? "User"}
-              </p>
+              <p className="text-xs font-medium text-white/80 truncate">{profile?.full_name ?? "User"}</p>
               <p className="text-xs text-white/30 truncate">{profile?.email ?? userEmail}</p>
             </div>
           </div>
 
           <button
-            onClick={handleLogout}
+            onClick={() => void logout()}
             className="flex items-center gap-2 px-3 py-2 text-xs text-white/30 hover:text-white/70 transition-colors w-full rounded-xl hover:bg-white/5"
           >
             <LogOut className="w-3.5 h-3.5" />

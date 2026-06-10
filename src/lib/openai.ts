@@ -48,6 +48,7 @@ const MAX_TOKENS: Record<ContentFormat, number> = {
   twitter_thread: 600,
   linkedin: 400,
   newsletter: 900,
+  email_sequence: 1800,
 }
 
 // Groq free tier: ~6k TPM. Keep transcript short so parallel calls don't burst the limit.
