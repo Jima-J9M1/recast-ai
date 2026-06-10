@@ -1,5 +1,13 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as svcClient } from "@supabase/supabase-js";
+
+function adminClient() {
+  return svcClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 export async function GET() {
   const supabase = await createClient();
@@ -42,7 +50,8 @@ export async function POST(request: NextRequest) {
   const name = body.name?.trim();
   if (!name) return Response.json({ error: "Team name is required." }, { status: 400 });
 
-  const { data: team, error } = await supabase
+  const admin = adminClient();
+  const { data: team, error } = await admin
     .from("teams")
     .insert({ name, owner_id: user.id })
     .select("id, name, owner_id")
@@ -51,8 +60,8 @@ export async function POST(request: NextRequest) {
   if (error || !team) return Response.json({ error: "Failed to create team." }, { status: 500 });
 
   await Promise.all([
-    supabase.from("team_members").insert({ team_id: team.id, user_id: user.id, role: "owner" }),
-    supabase.from("users").update({ team_id: team.id }).eq("id", user.id),
+    admin.from("team_members").insert({ team_id: team.id, user_id: user.id, role: "owner", joined_at: new Date().toISOString() }),
+    admin.from("users").update({ team_id: team.id }).eq("id", user.id),
   ]);
 
   return Response.json({ team }, { status: 201 });
@@ -63,12 +72,13 @@ export async function DELETE() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: team } = await supabase.from("teams").select("id").eq("owner_id", user.id).single();
+  const admin = adminClient();
+  const { data: team } = await admin.from("teams").select("id").eq("owner_id", user.id).single();
   if (!team) return Response.json({ error: "No team to delete." }, { status: 404 });
 
-  // Clear team_id from all members first, then delete the team
-  await supabase.from("users").update({ team_id: null }).eq("team_id", team.id);
-  await supabase.from("teams").delete().eq("id", team.id);
+  await admin.from("users").update({ team_id: null }).eq("team_id", team.id);
+  await admin.from("team_members").delete().eq("team_id", team.id);
+  await admin.from("teams").delete().eq("id", team.id);
 
   return Response.json({ ok: true });
 }

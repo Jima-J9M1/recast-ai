@@ -12,14 +12,15 @@ export async function DELETE(
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   // Only the team owner can remove members (and can't remove themselves)
-  const { data: team } = await supabase.from("teams").select("id").eq("owner_id", user.id).single();
-  if (!team) return Response.json({ error: "Forbidden." }, { status: 403 });
   if (targetId === user.id) return Response.json({ error: "Cannot remove yourself. Delete the team instead." }, { status: 400 });
 
   const service = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+
+  const { data: team } = await service.from("teams").select("id").eq("owner_id", user.id).single();
+  if (!team) return Response.json({ error: "Forbidden." }, { status: 403 });
 
   await Promise.all([
     service.from("team_members").delete().eq("team_id", team.id).eq("user_id", targetId),
