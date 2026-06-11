@@ -15,24 +15,6 @@ const DIMENSIONS: Partial<Record<ContentFormat, string[]>> = {
   email_sequence: ["subjects", "narrative", "cta"],
 };
 
-const DIM_LABELS: Record<string, string> = {
-  hook:         "Hook",
-  clarity:      "Clarity",
-  seo_ready:    "SEO ready",
-  depth:        "Depth",
-  virality:     "Virality",
-  brevity:      "Brevity",
-  authority:    "Authority",
-  engagement:   "Engagement",
-  subject_line: "Subject line",
-  value:        "Value",
-  cta:          "CTA",
-  subjects:     "Subjects",
-  narrative:    "Narrative",
-};
-
-export { DIM_LABELS };
-
 export async function scoreOutput(content: string, format: ContentFormat): Promise<ContentScore | null> {
   const dims = DIMENSIONS[format];
   if (!dims) return null;

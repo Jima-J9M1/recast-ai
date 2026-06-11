@@ -7,7 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { createClient } from "@/lib/supabase/client";
 import type { Job, Output, ContentScore } from "@/types";
-import { DIM_LABELS } from "@/lib/scorer";
+import { DIM_LABELS } from "@/lib/score-labels";
 
 const TABS = [
   { type: "blog" as const,           icon: FileText,  label: "Blog Post"     },
