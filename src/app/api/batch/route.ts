@@ -4,6 +4,7 @@ import { generateAndSave } from "@/lib/processor";
 import { BATCH_LIMITS, PLAN_LIMITS, LANGUAGES, type ToneStyle, type Language, type Plan } from "@/types";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rateLimit";
 import { getTeamBilling } from "@/lib/team";
+import { friendlyJobError } from "@/lib/errors";
 
 const VALID_TONES = new Set<ToneStyle>([
   "professional", "casual", "storytelling", "educational", "humorous",
@@ -153,7 +154,8 @@ async function processOne(
     await supabase.from("jobs").update({ status: "generating", transcript }).eq("id", jobId);
     await generateAndSave(jobId, transcript, tone, language, seoMode, userId, currentMonth);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    await supabase.from("jobs").update({ status: "failed", error_message: message }).eq("id", jobId);
+    const raw = err instanceof Error ? err.message : "Unknown error";
+    console.error(`[job:${jobId}] FAILED:`, raw);
+    await supabase.from("jobs").update({ status: "failed", error_message: friendlyJobError(raw) }).eq("id", jobId);
   }
 }

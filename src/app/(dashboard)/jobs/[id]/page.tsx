@@ -431,17 +431,28 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   const [showChat, setShowChat]             = useState(false);
   const [starredIds, setStarredIds]         = useState<Set<string>>(new Set());
   const [rescoring, setRescoring]           = useState(false);
+  const [outputLoadError, setOutputLoadError] = useState(false);
 
-  const loadOutputs = useCallback(async (jobId: string) => {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("outputs")
-      .select("*")
-      .eq("job_id", jobId)
-      .order("version", { ascending: true });
-    const loaded = (data ?? []) as (Output & { starred?: boolean })[];
-    setOutputs(loaded);
-    setStarredIds(new Set(loaded.filter((o) => o.starred).map((o) => o.id)));
+  const loadOutputs = useCallback(async (jobId: string): Promise<boolean> => {
+    setOutputLoadError(false);
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (attempt > 0) await new Promise<void>((r) => setTimeout(r, attempt * 1200));
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("outputs")
+        .select("*")
+        .eq("job_id", jobId)
+        .order("version", { ascending: true });
+      if (error) { console.error("loadOutputs:", error.message); continue; }
+      const loaded = (data ?? []) as Output[];
+      if (loaded.length > 0) {
+        setOutputs(loaded);
+        setStarredIds(new Set(loaded.filter((o) => o.starred).map((o) => o.id)));
+        return true;
+      }
+    }
+    setOutputLoadError(true);
+    return false;
   }, []);
 
   useEffect(() => {
@@ -460,8 +471,9 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
       if (!data) return;
       setJob(data);
       if (data.status === "completed") {
-        await loadOutputs(id);
-        clearInterval(interval);
+        const ok = await loadOutputs(id);
+        if (ok) clearInterval(interval);
+        // if not ok, keep polling — outputs may not be written yet
       } else if (TERMINAL_STATUSES.has(data.status)) {
         clearInterval(interval);
       }
@@ -697,12 +709,9 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
       {job.status === "failed" && (
         <div className="glass rounded-2xl p-8 border border-red-500/15 mb-6">
           <p className="text-red-300 font-semibold mb-2">Processing failed</p>
-          {job.error_message && (
-            <p className="text-red-400/60 text-xs font-mono bg-red-500/5 rounded-lg px-3 py-2 mb-3 break-all">
-              {job.error_message}
-            </p>
-          )}
-          <p className="text-white/40 text-sm mb-4">This can happen if the video has no captions or is age-restricted.</p>
+          <p className="text-white/60 text-sm mb-5">
+            {job.error_message ?? "Something went wrong. Please try again."}
+          </p>
           <Link href="/new" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/8 text-white text-sm hover:bg-white/12 transition-colors">
             Try another video
           </Link>
@@ -717,6 +726,22 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
           <Link href="/new" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/8 text-white text-sm hover:bg-white/12 transition-colors">
             Start a new job
           </Link>
+        </div>
+      )}
+
+      {/* Output load error */}
+      {job.status === "completed" && outputLoadError && (
+        <div className="glass rounded-2xl p-6 border border-amber-500/15 mb-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-amber-300 font-semibold text-sm">Content didn't load</p>
+            <p className="text-white/40 text-xs mt-0.5">The job completed but outputs failed to load. Try refreshing.</p>
+          </div>
+          <button
+            onClick={() => void loadOutputs(id)}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500/10 text-amber-400 text-sm font-medium hover:bg-amber-500/20 transition-all"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </button>
         </div>
       )}
 

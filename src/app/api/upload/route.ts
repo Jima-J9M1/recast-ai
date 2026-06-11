@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateAndSave } from "@/lib/processor";
 import { PLAN_LIMITS, LANGUAGES, type ToneStyle, type Language } from "@/types";
 import { getTeamBilling } from "@/lib/team";
+import { friendlyJobError } from "@/lib/errors";
 
 const VALID_TONES = new Set<ToneStyle>(["professional", "casual", "storytelling", "educational", "humorous"]);
 const VALID_LANGUAGES = new Set<Language>(LANGUAGES.map((l) => l.code));
@@ -66,9 +67,9 @@ async function processAudioJob(
 
     console.log(`[job:${jobId}] completed`);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error(`[job:${jobId}] FAILED:`, message);
-    await supabase.from("jobs").update({ status: "failed", error_message: message }).eq("id", jobId);
+    const raw = err instanceof Error ? err.message : "Unknown error";
+    console.error(`[job:${jobId}] FAILED:`, raw);
+    await supabase.from("jobs").update({ status: "failed", error_message: friendlyJobError(raw) }).eq("id", jobId);
   }
 }
 
