@@ -50,12 +50,6 @@ export interface Job {
   outputs?: Output[]
 }
 
-export interface ContentScore {
-  overall: number
-  dimensions: Record<string, number>
-  tip: string
-}
-
 export interface Output {
   id: string
   job_id: string
@@ -64,7 +58,6 @@ export interface Output {
   version: number
   created_at: string
   starred?: boolean
-  score?: ContentScore | null
 }
 
 export interface PromptTemplate {

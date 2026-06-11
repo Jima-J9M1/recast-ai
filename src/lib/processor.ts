@@ -7,7 +7,6 @@ import {
   SEO_BLOG_PROMPT,
   type BrandVoice,
 } from "@/lib/openai";
-import { scoreJobOutputs } from "@/lib/scorer";
 import type { ToneStyle } from "@/types";
 
 export async function generateAndSave(
@@ -60,9 +59,7 @@ export async function generateAndSave(
   await supabase.from("jobs").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", jobId);
   await supabase.rpc("increment_usage", { p_user_id: userId, p_month: currentMonth });
 
-  // Fire webhooks + scoring (best-effort, non-blocking)
   void fireWebhooks(userId, jobId, title ?? "");
-  void scoreJobOutputs(jobId);
 }
 
 async function fireWebhooks(userId: string, jobId: string, title: string) {

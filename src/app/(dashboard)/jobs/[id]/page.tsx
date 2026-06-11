@@ -1,13 +1,12 @@
 "use client";
 
 import { use, useEffect, useState, useCallback, useRef } from "react";
-import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw, Save, MessageSquare, SendHorizonal, Star, AtSign, Gauge, ChevronDown } from "lucide-react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw, Save, MessageSquare, SendHorizonal, Star, AtSign } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { createClient } from "@/lib/supabase/client";
-import type { Job, Output, ContentScore } from "@/types";
-import { DIM_LABELS } from "@/lib/score-labels";
+import type { Job, Output } from "@/types";
 
 const TABS = [
   { type: "blog" as const,           icon: FileText,  label: "Blog Post"     },
@@ -341,77 +340,6 @@ function ChatPanel({ jobId }: ChatPanelProps) {
   );
 }
 
-// ── Score helpers ─────────────────────────────────────────────────────────────
-
-function scoreColor(n: number): string {
-  if (n >= 8) return "text-emerald-400";
-  if (n >= 5) return "text-amber-400";
-  return "text-red-400";
-}
-
-function scoreBg(n: number): string {
-  if (n >= 8) return "bg-emerald-500/15 border-emerald-500/25";
-  if (n >= 5) return "bg-amber-500/15 border-amber-500/25";
-  return "bg-red-500/15 border-red-500/25";
-}
-
-interface ScorePanelProps {
-  readonly score: ContentScore;
-  readonly onRescore: () => void;
-  readonly rescoring: boolean;
-}
-
-function ScorePanel({ score, onRescore, rescoring }: ScorePanelProps) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className={`rounded-xl border px-3 py-1.5 flex items-center gap-2 text-xs font-semibold transition-all cursor-pointer select-none ${scoreBg(score.overall)}`}
-      onClick={() => setOpen((v) => !v)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setOpen((v) => !v); }}
-    >
-      <Gauge className={`w-3.5 h-3.5 ${scoreColor(score.overall)}`} />
-      <span className={scoreColor(score.overall)}>{score.overall}/10</span>
-      <ChevronDown className={`w-3 h-3 text-white/30 transition-transform ${open ? "rotate-180" : ""}`} />
-
-      {open && (
-        <div
-          className="absolute right-0 top-full mt-2 z-30 w-64 glass rounded-xl border border-white/10 shadow-xl p-4 space-y-3"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="space-y-2">
-            {Object.entries(score.dimensions).map(([key, val]) => (
-              <div key={key} className="flex items-center gap-2">
-                <span className="text-white/40 text-xs w-24 shrink-0">{DIM_LABELS[key] ?? key}</span>
-                <div className="flex-1 h-1.5 rounded-full bg-white/8">
-                  <div
-                    className={`h-1.5 rounded-full transition-all ${val >= 8 ? "bg-emerald-400" : val >= 5 ? "bg-amber-400" : "bg-red-400"}`}
-                    style={{ width: `${val * 10}%` }}
-                  />
-                </div>
-                <span className={`text-xs font-bold w-4 text-right ${scoreColor(val)}`}>{val}</span>
-              </div>
-            ))}
-          </div>
-          {score.tip && (
-            <p className="text-xs text-white/40 border-t border-white/5 pt-3 leading-relaxed">
-              💡 {score.tip}
-            </p>
-          )}
-          <button
-            onClick={() => { void onRescore(); setOpen(false); }}
-            disabled={rescoring}
-            className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white text-xs transition-all disabled:opacity-40"
-          >
-            <RefreshCw className={`w-3 h-3 ${rescoring ? "animate-spin" : ""}`} />
-            {rescoring ? "Rescoring…" : "Rescore"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function JobPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = use(params);
@@ -430,7 +358,6 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   const [saving, setSaving]                 = useState(false);
   const [showChat, setShowChat]             = useState(false);
   const [starredIds, setStarredIds]         = useState<Set<string>>(new Set());
-  const [rescoring, setRescoring]           = useState(false);
   const [outputLoadError, setOutputLoadError] = useState(false);
   const loadingRef  = useRef(false);
   const loadedRef   = useRef(false);
@@ -616,22 +543,6 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
     setStopping(false);
   }
 
-  async function handleRescore() {
-    setRescoring(true);
-    try {
-      const res = await fetch(`/api/jobs/${id}/score`, { method: "POST" });
-      if (res.ok) {
-        const { outputs: scored } = await res.json() as { outputs: { id: string; type: string; score: ContentScore | null }[] };
-        setOutputs((prev) => prev.map((o) => {
-          const updated = scored.find((s) => s.id === o.id);
-          return updated ? { ...o, score: updated.score } : o;
-        }));
-      }
-    } finally {
-      setRescoring(false);
-    }
-  }
-
   const displayContent = previewContent ?? activeOutput?.content ?? "";
   const wordCount = displayContent.split(/\s+/).filter(Boolean).length;
 
@@ -763,8 +674,6 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
             {TABS.map((tab) => {
               const has    = outputs.some((o) => o.type === tab.type);
               const active = !showChat && activeTab === tab.type;
-              const tabOutput = outputs.filter((o) => o.type === tab.type).sort((a, b) => b.version - a.version)[0];
-              const tabScore  = tabOutput?.score;
               return (
                 <button
                   key={tab.type}
@@ -774,11 +683,6 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                 >
                   <tab.icon className="w-3.5 h-3.5" />
                   {tab.label}
-                  {tabScore && (
-                    <span className={`text-xs font-bold leading-none ${scoreColor(tabScore.overall)}`}>
-                      {tabScore.overall}
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -809,21 +713,6 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                     <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 font-medium">
                       Preview
                     </span>
-                  )}
-                  {activeOutput?.score && previewContent === null && (
-                    <div className="relative">
-                      <ScorePanel score={activeOutput.score} onRescore={handleRescore} rescoring={rescoring} />
-                    </div>
-                  )}
-                  {!activeOutput?.score && previewContent === null && activeTab !== "extras" && (
-                    <button
-                      onClick={() => void handleRescore()}
-                      disabled={rescoring}
-                      className="flex items-center gap-1 text-xs text-white/20 hover:text-white/50 transition-colors disabled:opacity-40"
-                    >
-                      <Gauge className="w-3 h-3" />
-                      {rescoring ? "Scoring…" : "Score"}
-                    </button>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
