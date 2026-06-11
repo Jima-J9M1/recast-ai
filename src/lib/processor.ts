@@ -39,18 +39,14 @@ export async function generateAndSave(
     ? SEO_BLOG_PROMPT + bvNote
     : applyBrandVoice("blog", customPrompts["blog"], bvNote);
 
-  const [title, blog, twitter] = await Promise.all([
-    generateTitle(transcript),
-    generateContent(transcript, "blog", tone, blogPrompt, language),
-    generateContent(transcript, "twitter_thread", tone, applyBrandVoice("twitter_thread", customPrompts["twitter_thread"], bvNote), language),
-  ]);
-
-  const [linkedin, newsletter, emailSeq, extras] = await Promise.all([
-    generateContent(transcript, "linkedin", tone, applyBrandVoice("linkedin", customPrompts["linkedin"], bvNote), language),
-    generateContent(transcript, "newsletter", tone, applyBrandVoice("newsletter", customPrompts["newsletter"], bvNote), language),
-    generateContent(transcript, "email_sequence", tone, applyBrandVoice("email_sequence", customPrompts["email_sequence"], bvNote), language),
-    generateExtras(transcript),
-  ]);
+  // Sequential to stay within Groq's 6k TPM free-tier limit
+  const title      = await generateTitle(transcript);
+  const blog       = await generateContent(transcript, "blog",           tone, blogPrompt, language);
+  const twitter    = await generateContent(transcript, "twitter_thread", tone, applyBrandVoice("twitter_thread", customPrompts["twitter_thread"], bvNote), language);
+  const linkedin   = await generateContent(transcript, "linkedin",       tone, applyBrandVoice("linkedin",       customPrompts["linkedin"],       bvNote), language);
+  const newsletter = await generateContent(transcript, "newsletter",     tone, applyBrandVoice("newsletter",     customPrompts["newsletter"],     bvNote), language);
+  const emailSeq   = await generateContent(transcript, "email_sequence", tone, applyBrandVoice("email_sequence", customPrompts["email_sequence"], bvNote), language);
+  const extras     = await generateExtras(transcript);
 
   await supabase.from("jobs").update({ title }).eq("id", jobId);
   await supabase.from("outputs").insert([

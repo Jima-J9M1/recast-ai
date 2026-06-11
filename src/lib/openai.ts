@@ -9,6 +9,8 @@ export { DEFAULT_PROMPTS }
 export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
   baseURL: 'https://api.groq.com/openai/v1',
+  maxRetries: 6,
+  timeout: 90_000,
 })
 
 const TONE_INSTRUCTIONS: Record<ToneStyle, string> = {

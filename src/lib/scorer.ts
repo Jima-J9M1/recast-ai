@@ -20,7 +20,7 @@ export async function scoreOutput(content: string, format: ContentFormat): Promi
   if (!dims) return null;
 
   const dimList = dims.map((d) => `"${d}": <1-10>`).join(", ");
-  const prompt = `Score this ${format.replace(/_/g, " ")} content on a 1-10 scale. Return ONLY valid JSON, no other text.
+  const prompt = `Score this ${format.replaceAll("_", " ")} content on a 1-10 scale. Return ONLY valid JSON, no other text.
 
 Schema: {"overall": <1-10>, "dimensions": {${dimList}}, "tip": "<one concrete improvement, max 80 chars>"}
 
@@ -58,8 +58,8 @@ ${content.slice(0, 1500)}`;
 export async function scoreJobOutputs(jobId: string): Promise<void> {
   const { createClient } = await import("@supabase/supabase-js");
   const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""
   );
 
   const { data: outputs } = await supabase
@@ -70,12 +70,15 @@ export async function scoreJobOutputs(jobId: string): Promise<void> {
 
   if (!outputs?.length) return;
 
-  await Promise.allSettled(
-    (outputs as { id: string; type: string; content: string }[]).map(async (output) => {
-      const score = await scoreOutput(output.content, output.type as ContentFormat);
-      if (score) {
-        await supabase.from("outputs").update({ score }).eq("id", output.id);
-      }
-    })
-  );
+  // Wait for generation Groq calls to clear the TPM window before scoring
+  await new Promise((r) => setTimeout(r, 8_000));
+
+  // Sequential to avoid hitting the 6k TPM limit right after generation
+  for (const output of outputs as { id: string; type: string; content: string }[]) {
+    const score = await scoreOutput(output.content, output.type as ContentFormat);
+    if (score) {
+      await supabase.from("outputs").update({ score }).eq("id", output.id);
+    }
+    await new Promise((r) => setTimeout(r, 1_500));
+  }
 }
