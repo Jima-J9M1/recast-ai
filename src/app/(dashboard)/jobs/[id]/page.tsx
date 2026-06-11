@@ -432,27 +432,38 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   const [starredIds, setStarredIds]         = useState<Set<string>>(new Set());
   const [rescoring, setRescoring]           = useState(false);
   const [outputLoadError, setOutputLoadError] = useState(false);
+  const loadingRef  = useRef(false);
+  const loadedRef   = useRef(false);
+  const failCountRef = useRef(0);
 
   const loadOutputs = useCallback(async (jobId: string): Promise<boolean> => {
-    setOutputLoadError(false);
-    for (let attempt = 0; attempt < 4; attempt++) {
-      if (attempt > 0) await new Promise<void>((r) => setTimeout(r, attempt * 1200));
+    if (loadedRef.current) return true;
+    if (loadingRef.current) return false;
+    loadingRef.current = true;
+    try {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("outputs")
         .select("*")
         .eq("job_id", jobId)
         .order("version", { ascending: true });
-      if (error) { console.error("loadOutputs:", error.message); continue; }
-      const loaded = (data ?? []) as Output[];
-      if (loaded.length > 0) {
-        setOutputs(loaded);
-        setStarredIds(new Set(loaded.filter((o) => o.starred).map((o) => o.id)));
-        return true;
+      if (!error) {
+        const loaded = (data ?? []) as Output[];
+        if (loaded.length > 0) {
+          setOutputs(loaded);
+          setStarredIds(new Set(loaded.filter((o) => o.starred).map((o) => o.id)));
+          setOutputLoadError(false);
+          loadedRef.current = true;
+          failCountRef.current = 0;
+          return true;
+        }
       }
+      failCountRef.current += 1;
+      if (failCountRef.current >= 5) setOutputLoadError(true);
+      return false;
+    } finally {
+      loadingRef.current = false;
     }
-    setOutputLoadError(true);
-    return false;
   }, []);
 
   useEffect(() => {
@@ -472,8 +483,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
       setJob(data);
       if (data.status === "completed") {
         const ok = await loadOutputs(id);
-        if (ok) clearInterval(interval);
-        // if not ok, keep polling — outputs may not be written yet
+        if (ok || failCountRef.current >= 5) clearInterval(interval);
       } else if (TERMINAL_STATUSES.has(data.status)) {
         clearInterval(interval);
       }
