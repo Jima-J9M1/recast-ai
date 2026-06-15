@@ -48,7 +48,7 @@ export async function generateAndSave(
   const extras     = await generateExtras(transcript);
 
   await supabase.from("jobs").update({ title }).eq("id", jobId);
-  await supabase.from("outputs").insert([
+  const { error: insertError } = await supabase.from("outputs").insert([
     { job_id: jobId, type: "blog",           content: blog,      version: 1 },
     { job_id: jobId, type: "twitter_thread", content: twitter,   version: 1 },
     { job_id: jobId, type: "linkedin",       content: linkedin,  version: 1 },
@@ -56,6 +56,7 @@ export async function generateAndSave(
     { job_id: jobId, type: "email_sequence", content: emailSeq,  version: 1 },
     { job_id: jobId, type: "extras",         content: extras,    version: 1 },
   ]);
+  if (insertError) throw new Error(`Failed to save outputs: ${insertError.message}`);
   await supabase.from("jobs").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", jobId);
   await supabase.rpc("increment_usage", { p_user_id: userId, p_month: currentMonth });
 
