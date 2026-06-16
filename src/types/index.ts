@@ -76,8 +76,8 @@ export interface Usage {
 }
 
 export const PLAN_LIMITS: Record<Plan, number | null> = {
-  free: 1,
-  starter: 10,
+  free: 3,
+  starter: 25,
   pro: null,
 }
 
@@ -88,14 +88,14 @@ export const PLAN_PRICES = {
 
 export const BATCH_LIMITS: Record<Plan, number> = {
   free: 0,
-  starter: 5,
-  pro: 20,
+  starter: 10,
+  pro: 50,
 }
 
 export const FEED_LIMITS: Record<Plan, number> = {
   free: 0,
-  starter: 1,
-  pro: 5,
+  starter: 3,
+  pro: 10,
 }
 
 export interface Feed {

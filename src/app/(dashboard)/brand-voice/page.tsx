@@ -92,7 +92,7 @@ export default function BrandVoicePage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+        <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
       </div>
     );
   }
@@ -101,8 +101,8 @@ export default function BrandVoicePage() {
     <div className="p-8 max-w-2xl animate-fade-in-up">
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-violet-500/15 flex items-center justify-center">
-            <Mic2 className="w-5 h-5 text-violet-400" />
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center">
+            <Mic2 className="w-5 h-5 text-amber-400" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-white">Brand Voice</h1>
@@ -113,7 +113,7 @@ export default function BrandVoicePage() {
         <button
           onClick={handleSave}
           disabled={saving || !isDirty}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-500 transition-all disabled:opacity-40 shrink-0"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-500 transition-all disabled:opacity-40 shrink-0"
         >
           {savedOk ? (
             <><CheckCircle2 className="w-4 h-4 text-emerald-300" /> Saved</>
@@ -126,7 +126,7 @@ export default function BrandVoicePage() {
       </div>
 
       {!hasAnyContent && (
-        <div className="mt-4 mb-6 px-4 py-3 rounded-xl bg-violet-500/8 border border-violet-500/15 text-sm text-violet-300/70">
+        <div className="mt-4 mb-6 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/15 text-sm text-amber-300/70">
           Fill in at least one field — your brand voice will be injected into every generation prompt automatically.
         </div>
       )}
@@ -140,7 +140,7 @@ export default function BrandVoicePage() {
               onChange={(e) => setVoice((prev) => ({ ...prev, [key]: e.target.value }))}
               rows={rows}
               placeholder={hint}
-              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/20 text-sm focus:outline-none focus:border-violet-500/60 transition-all resize-none"
+              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/20 text-sm focus:outline-none focus:border-amber-500/60 transition-all resize-none"
             />
           </div>
         ))}

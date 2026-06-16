@@ -129,8 +129,8 @@ export default function ReversePage() {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-9 h-9 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center">
-            <Repeat2 className="w-5 h-5 text-violet-400" />
+          <div className="w-9 h-9 rounded-xl bg-amber-600/20 border border-amber-500/30 flex items-center justify-center">
+            <Repeat2 className="w-5 h-5 text-amber-400" />
           </div>
           <h1 className="text-2xl font-bold text-white">Reverse Repurposing</h1>
         </div>
@@ -151,7 +151,7 @@ export default function ReversePage() {
           onChange={(e) => setText(e.target.value)}
           placeholder="Paste your blog post, newsletter, article, or any long-form text here…"
           rows={10}
-          className="w-full bg-white/[0.03] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-violet-500/40 focus:bg-white/[0.05] resize-none transition-all"
+          className="w-full bg-white/[0.03] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-500/40 focus:bg-white/[0.05] resize-none transition-all"
         />
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -159,7 +159,7 @@ export default function ReversePage() {
           <select
             value={tone}
             onChange={(e) => setTone(e.target.value as ToneStyle)}
-            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/40"
+            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500/40"
           >
             {TONES.map((t) => (
               <option key={t.value} value={t.value} className="bg-zinc-900">{t.label}</option>
@@ -170,7 +170,7 @@ export default function ReversePage() {
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as Language)}
-            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/40"
+            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500/40"
           >
             {LANGUAGES.map((l) => (
               <option key={l.code} value={l.code} className="bg-zinc-900">{l.flag} {l.code}</option>
@@ -186,7 +186,7 @@ export default function ReversePage() {
             <button
               onClick={() => void handleGenerate()}
               disabled={loading || text.trim().length < 50}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-all shadow-lg shadow-violet-900/30 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold transition-all shadow-lg shadow-amber-900/30 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {loading
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>
@@ -202,10 +202,10 @@ export default function ReversePage() {
       {loading && (
         <div className="glass rounded-2xl p-12 text-center">
           <div className="relative w-14 h-14 mx-auto mb-5">
-            <div className="absolute inset-0 rounded-full border-2 border-violet-500/20" />
-            <div className="absolute inset-0 rounded-full border-2 border-t-violet-500 animate-spin" />
-            <div className="absolute inset-2 rounded-full bg-violet-900/30 flex items-center justify-center">
-              <Repeat2 className="w-5 h-5 text-violet-400" />
+            <div className="absolute inset-0 rounded-full border-2 border-amber-500/20" />
+            <div className="absolute inset-0 rounded-full border-2 border-t-amber-500 animate-spin" />
+            <div className="absolute inset-2 rounded-full bg-amber-900/30 flex items-center justify-center">
+              <Repeat2 className="w-5 h-5 text-amber-400" />
             </div>
           </div>
           <p className="text-white font-semibold text-lg mb-1">Generating 4 outputs…</p>
@@ -226,7 +226,7 @@ export default function ReversePage() {
                   onClick={() => setActiveTab(tab.key)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     active
-                      ? "bg-violet-600 text-white shadow-lg shadow-violet-900/40"
+                      ? "bg-amber-600 text-white shadow-lg shadow-amber-900/40"
                       : "text-white/50 hover:text-white hover:bg-white/5"
                   }`}
                 >

@@ -123,7 +123,7 @@ export default async function HistoryPage({ searchParams }: Readonly<{ searchPar
         </div>
         <Link
           href="/new"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-500 transition-all shadow-lg shadow-violet-900/30"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-500 transition-all shadow-lg shadow-amber-900/30"
         >
           <PlusCircle className="w-4 h-4" /> New content
         </Link>
@@ -216,16 +216,23 @@ function JobList({ jobs, page, totalPages, count, filters }: Readonly<{
 
 function EmptyState({ hasFilters }: Readonly<{ hasFilters: boolean }>) {
   return (
-    <div className="glass rounded-2xl p-16 text-center border border-dashed border-white/10">
-      <p className="text-white/40 font-medium mb-1">
-        {hasFilters ? "No jobs match your filters" : "No content yet"}
+    <div className="glass rounded-2xl p-16 text-center">
+      <div className="w-14 h-14 rounded-2xl bg-amber-900/30 flex items-center justify-center mx-auto mb-5">
+        {hasFilters
+          ? <Clock className="w-7 h-7 text-white/30" />
+          : <PlusCircle className="w-7 h-7 text-amber-400" />}
+      </div>
+      <p className="text-white font-semibold text-lg mb-2">
+        {hasFilters ? "No results" : "Nothing here yet"}
       </p>
-      <p className="text-white/25 text-sm mb-6">
-        {hasFilters ? "Try adjusting your search or filters." : "Paste a YouTube URL and watch the magic happen."}
+      <p className="text-white/40 text-sm mb-6 max-w-xs mx-auto">
+        {hasFilters
+          ? "Try clearing your filters or searching for something else."
+          : "Your generated content will appear here. Each video you process creates a job you can revisit anytime."}
       </p>
-      {hasFilters ? null : (
-        <Link href="/new" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-500 transition-all">
-          <PlusCircle className="w-4 h-4" /> Create your first content
+      {!hasFilters && (
+        <Link href="/new" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-500 transition-all shadow-lg shadow-amber-900/30">
+          <PlusCircle className="w-4 h-4" /> Generate your first content
         </Link>
       )}
     </div>

@@ -21,7 +21,7 @@ const FORMAT_META: Record<string, { icon: React.ElementType; label: string; colo
   blog:           { icon: FileText,  label: "Blog Post",      color: "text-blue-400"   },
   twitter_thread: { icon: Hash,      label: "Twitter",        color: "text-sky-400"    },
   linkedin:       { icon: Briefcase, label: "LinkedIn",       color: "text-blue-500"   },
-  newsletter:     { icon: Mail,      label: "Newsletter",     color: "text-violet-400" },
+  newsletter:     { icon: Mail,      label: "Newsletter",     color: "text-amber-400" },
   email_sequence: { icon: AtSign,    label: "Email Sequence", color: "text-emerald-400"},
   extras:         { icon: Layers,    label: "Extras",         color: "text-white/40"   },
 };
@@ -96,7 +96,7 @@ export default function LibraryPage() {
             onClick={() => setFilter(f.value)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               filter === f.value
-                ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+                ? "bg-amber-600/20 text-amber-300 border border-amber-500/30"
                 : "glass text-white/40 hover:text-white/70 hover:bg-white/5"
             }`}
           >
@@ -107,18 +107,26 @@ export default function LibraryPage() {
 
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <Loader2 className="w-5 h-5 text-violet-400 animate-spin" />
+          <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="glass rounded-2xl flex flex-col items-center justify-center py-20 text-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
-            <Star className="w-5 h-5 text-amber-400/50" />
+        <div className="glass rounded-2xl flex flex-col items-center justify-center py-20 text-center px-8">
+          <div className="w-14 h-14 rounded-2xl bg-amber-900/30 flex items-center justify-center mb-5">
+            <Star className="w-7 h-7 text-amber-400" />
           </div>
-          <p className="text-white/40 text-sm">
-            {outputs.length === 0
-              ? "No saved outputs yet. Hit the ★ button on any output to save it here."
-              : "No saved outputs matching this filter."}
+          <p className="text-white font-semibold text-lg mb-2">
+            {outputs.length === 0 ? "Your library is empty" : "No saved outputs here"}
           </p>
+          <p className="text-white/40 text-sm max-w-xs">
+            {outputs.length === 0
+              ? "Open any generated job and hit the ★ on an output you want to keep. It'll live here."
+              : "Nothing saved under this filter yet. Try a different format."}
+          </p>
+          {outputs.length === 0 && (
+            <Link href="/new" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-500 transition-all shadow-lg shadow-amber-900/30 mt-6">
+              <Star className="w-4 h-4" /> Generate something to save
+            </Link>
+          )}
         </div>
       ) : (
         <div className="space-y-4">

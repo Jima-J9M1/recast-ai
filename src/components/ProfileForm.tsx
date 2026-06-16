@@ -42,7 +42,7 @@ export function ProfileForm({ initialName, email }: Readonly<Props>) {
 
       <div className="flex items-start gap-5">
         {/* Avatar */}
-        <div className="w-14 h-14 rounded-2xl bg-violet-700 flex items-center justify-center text-xl font-bold text-white shrink-0">
+        <div className="w-14 h-14 rounded-2xl bg-amber-700 flex items-center justify-center text-xl font-bold text-white shrink-0">
           {initial}
         </div>
 
@@ -57,7 +57,7 @@ export function ProfileForm({ initialName, email }: Readonly<Props>) {
               type="text"
               value={name}
               onChange={(e) => { setName(e.target.value); setError(""); setSaved(false); }}
-              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/25 focus:outline-none focus:border-violet-500/60 transition-all text-sm"
+              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/25 focus:outline-none focus:border-amber-500/60 transition-all text-sm"
               placeholder="Your name"
             />
           </div>
@@ -76,7 +76,7 @@ export function ProfileForm({ initialName, email }: Readonly<Props>) {
             <button
               onClick={() => void handleSave()}
               disabled={saving || !isDirty}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {saving ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>

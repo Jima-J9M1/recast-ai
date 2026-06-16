@@ -48,7 +48,7 @@ function CopyLink({ url }: Readonly<{ url: string }>) {
       <p className="flex-1 text-xs text-white/50 truncate font-mono">{url}</p>
       <button
         onClick={() => void copy()}
-        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${copied ? "bg-emerald-600/20 text-emerald-400" : "bg-violet-600 text-white hover:bg-violet-500"}`}
+        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${copied ? "bg-emerald-600/20 text-emerald-400" : "bg-amber-600 text-white hover:bg-amber-500"}`}
       >
         {copied ? <><Check className="w-3.5 h-3.5" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
       </button>
@@ -162,7 +162,7 @@ export default function TeamPage() {
 
   if (loading) return (
     <div className="p-8 flex items-center justify-center h-64">
-      <Loader2 className="w-5 h-5 text-violet-400 animate-spin" />
+      <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
     </div>
   );
 
@@ -186,13 +186,13 @@ export default function TeamPage() {
                 onChange={(e) => setTeamName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") void createTeam(); }}
                 placeholder="Team name…"
-                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/25 focus:outline-none focus:border-violet-500/60 transition-all text-sm"
+                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/25 focus:outline-none focus:border-amber-500/60 transition-all text-sm"
               />
               {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
               <button
                 onClick={() => void createTeam()}
                 disabled={creating || !teamName.trim()}
-                className="mt-3 w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-500 transition-all disabled:opacity-40"
+                className="mt-3 w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-amber-600 text-white font-semibold hover:bg-amber-500 transition-all disabled:opacity-40"
               >
                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 {creating ? "Creating…" : "Create team"}
@@ -206,7 +206,7 @@ export default function TeamPage() {
                 value={joinToken}
                 onChange={(e) => setJoinToken(e.target.value)}
                 placeholder="Paste invite token or link…"
-                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/25 focus:outline-none focus:border-violet-500/60 transition-all text-sm"
+                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/25 focus:outline-none focus:border-amber-500/60 transition-all text-sm"
               />
               {joinError && <p className="text-xs text-red-400 mt-2">{joinError}</p>}
               <button
@@ -220,11 +220,11 @@ export default function TeamPage() {
           </div>
         ) : (
           <div className="glass rounded-2xl p-8 text-center space-y-4">
-            <div className="w-12 h-12 rounded-full bg-violet-900/30 flex items-center justify-center mx-auto">
-              <Users className="w-5 h-5 text-violet-400/60" />
+            <div className="w-12 h-12 rounded-full bg-amber-900/30 flex items-center justify-center mx-auto">
+              <Users className="w-5 h-5 text-amber-400/60" />
             </div>
             <p className="text-white/50 text-sm">Team workspace is available on the Pro plan.</p>
-            <a href="/billing" className="inline-block text-xs text-violet-400 hover:text-violet-300 font-semibold transition-colors">Upgrade to Pro →</a>
+            <a href="/billing" className="inline-block text-xs text-amber-400 hover:text-amber-300 font-semibold transition-colors">Upgrade to Pro →</a>
           </div>
         )}
       </div>
@@ -248,9 +248,9 @@ export default function TeamPage() {
                 value={renameVal}
                 onChange={(e) => setRenameVal(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") void saveName(); else if (e.key === "Escape") setRenaming(false); }}
-                className="text-2xl font-bold bg-transparent border-b border-violet-500 text-white focus:outline-none w-full"
+                className="text-2xl font-bold bg-transparent border-b border-amber-500 text-white focus:outline-none w-full"
               />
-              <button onClick={() => void saveName()} disabled={savingName} className="shrink-0 text-violet-400 hover:text-violet-300 disabled:opacity-40">
+              <button onClick={() => void saveName()} disabled={savingName} className="shrink-0 text-amber-400 hover:text-amber-300 disabled:opacity-40">
                 {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               </button>
               <button onClick={() => setRenaming(false)} className="shrink-0 text-white/30 hover:text-white/60">
@@ -274,7 +274,7 @@ export default function TeamPage() {
           <div className="flex items-center gap-3 mt-1">
             <span className="text-white/40 text-sm">{seatCount}/{seatLimit} seats</span>
             <span className="w-1 h-1 rounded-full bg-white/20" />
-            <span className="text-xs text-violet-400 font-medium">Pro</span>
+            <span className="text-xs text-amber-400 font-medium">Pro</span>
           </div>
         </div>
         {isOwner && (
@@ -299,7 +299,7 @@ export default function TeamPage() {
             const email = m.users?.email ?? "";
             return (
               <div key={m.user_id} className="flex items-center gap-3 px-5 py-3.5">
-                <div className="w-8 h-8 rounded-full bg-violet-700/40 flex items-center justify-center text-xs font-bold text-white/70 shrink-0">
+                <div className="w-8 h-8 rounded-full bg-amber-700/40 flex items-center justify-center text-xs font-bold text-white/70 shrink-0">
                   {(name[0] ?? "?").toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -339,7 +339,7 @@ export default function TeamPage() {
             <button
               onClick={() => void generateInvite()}
               disabled={inviting}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-500 transition-all disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-500 transition-all disabled:opacity-40"
             >
               {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
               {inviting ? "Generating…" : "Generate invite link"}

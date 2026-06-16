@@ -58,7 +58,7 @@ function AddFeedForm({ onAdd, feedsCount, feedLimit }: AddFeedFormProps) {
           onChange={(e) => { setChannelUrl(e.target.value); setError(""); }}
           disabled={saving || atLimit}
           placeholder="https://youtube.com/@channelname or channel/UCxxx"
-          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/25 focus:outline-none focus:border-violet-500/60 transition-all disabled:opacity-50 text-sm"
+          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/25 focus:outline-none focus:border-amber-500/60 transition-all disabled:opacity-50 text-sm"
         />
         <p className="mt-1.5 text-xs text-white/25">Paste a YouTube channel URL, @handle, or channel ID starting with UC.</p>
       </div>
@@ -69,9 +69,9 @@ function AddFeedForm({ onAdd, feedsCount, feedLimit }: AddFeedFormProps) {
             value={tone}
             onChange={(e) => setTone(e.target.value as ToneStyle)}
             disabled={saving}
-            className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/8 text-white text-sm focus:outline-none focus:border-violet-500/60 transition-all appearance-none disabled:opacity-50"
+            className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/8 text-white text-sm focus:outline-none focus:border-amber-500/60 transition-all appearance-none disabled:opacity-50"
           >
-            {TONES.map((t) => <option key={t.value} value={t.value} className="bg-[#0d0d1a]">{t.label}</option>)}
+            {TONES.map((t) => <option key={t.value} value={t.value} className="bg-[#161310]">{t.label}</option>)}
           </select>
         </div>
         <div>
@@ -80,9 +80,9 @@ function AddFeedForm({ onAdd, feedsCount, feedLimit }: AddFeedFormProps) {
             value={language}
             onChange={(e) => setLanguage(e.target.value as Language)}
             disabled={saving}
-            className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/8 text-white text-sm focus:outline-none focus:border-violet-500/60 transition-all appearance-none disabled:opacity-50"
+            className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/8 text-white text-sm focus:outline-none focus:border-amber-500/60 transition-all appearance-none disabled:opacity-50"
           >
-            {LANGUAGES.map((l) => <option key={l.code} value={l.code} className="bg-[#0d0d1a]">{l.flag} {l.code}</option>)}
+            {LANGUAGES.map((l) => <option key={l.code} value={l.code} className="bg-[#161310]">{l.flag} {l.code}</option>)}
           </select>
         </div>
       </div>
@@ -96,7 +96,7 @@ function AddFeedForm({ onAdd, feedsCount, feedLimit }: AddFeedFormProps) {
           onClick={() => setSeoMode((v) => !v)}
           disabled={saving}
           aria-pressed={seoMode}
-          className={`relative w-11 h-6 rounded-full transition-all disabled:opacity-40 shrink-0 ${seoMode ? "bg-violet-600" : "bg-white/10"}`}
+          className={`relative w-11 h-6 rounded-full transition-all disabled:opacity-40 shrink-0 ${seoMode ? "bg-amber-600" : "bg-white/10"}`}
         >
           <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${seoMode ? "translate-x-5" : "translate-x-0"}`} />
         </button>
@@ -105,7 +105,7 @@ function AddFeedForm({ onAdd, feedsCount, feedLimit }: AddFeedFormProps) {
       <button
         type="submit"
         disabled={saving || !channelUrl.trim() || atLimit}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-500 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-500 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
         Add Feed
@@ -157,7 +157,7 @@ function FeedRow({ feed, onToggle, onDelete }: FeedRowProps) {
           className="p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all disabled:opacity-40"
         >
           {feed.active
-            ? <ToggleRight className="w-5 h-5 text-violet-400" />
+            ? <ToggleRight className="w-5 h-5 text-amber-400" />
             : <ToggleLeft className="w-5 h-5" />}
         </button>
         <button
@@ -216,8 +216,8 @@ export default function FeedsPage() {
           <p className="text-white/40 mt-1">Automatically process new YouTube videos from channels.</p>
         </div>
         <div className="glass rounded-2xl p-10 flex flex-col items-center text-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-violet-900/40 flex items-center justify-center">
-            <Lock className="w-7 h-7 text-violet-400" />
+          <div className="w-14 h-14 rounded-2xl bg-amber-900/40 flex items-center justify-center">
+            <Lock className="w-7 h-7 text-amber-400" />
           </div>
           <div>
             <p className="text-lg font-semibold text-white">Starter &amp; Pro feature</p>
@@ -227,7 +227,7 @@ export default function FeedsPage() {
           </div>
           <Link
             href="/upgrade"
-            className="mt-2 px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-500 transition-all"
+            className="mt-2 px-5 py-2.5 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-500 transition-all"
           >
             Upgrade to Starter — $19/mo
           </Link>
@@ -241,7 +241,7 @@ export default function FeedsPage() {
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <h1 className="text-2xl font-bold text-white">RSS Auto-Import</h1>
-          <span className="px-2.5 py-1 rounded-full bg-violet-600/20 text-violet-300 text-xs font-semibold border border-violet-500/20">
+          <span className="px-2.5 py-1 rounded-full bg-amber-600/20 text-amber-300 text-xs font-semibold border border-amber-500/20">
             {feeds.length} / {feedLimit}
           </span>
         </div>
@@ -255,9 +255,16 @@ export default function FeedsPage() {
       />
 
       {feeds.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-12 text-center">
-          <Rss className="w-8 h-8 text-white/15" />
-          <p className="text-white/30 text-sm">No channels added yet. Add one above to get started.</p>
+        <div className="glass rounded-2xl flex flex-col items-center py-14 text-center px-8 gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-amber-900/30 flex items-center justify-center">
+            <Rss className="w-7 h-7 text-amber-400" />
+          </div>
+          <div>
+            <p className="text-white font-semibold text-lg mb-1">No channels yet</p>
+            <p className="text-white/40 text-sm max-w-xs mx-auto">
+              Add a YouTube channel above. Every new video it publishes will be automatically turned into content — no manual work.
+            </p>
+          </div>
         </div>
       ) : (
         <div className="space-y-2">

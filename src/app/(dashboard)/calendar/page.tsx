@@ -117,7 +117,7 @@ export default function CalendarPage() {
           {/* Days */}
           {loading ? (
             <div className="flex items-center justify-center h-56">
-              <Loader2 className="w-5 h-5 text-violet-400 animate-spin" />
+              <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
             </div>
           ) : (
             <div className="grid grid-cols-7">
@@ -137,14 +137,14 @@ export default function CalendarPage() {
                     onClick={() => setSelected(isSel ? null : key)}
                     disabled={hasFuture}
                     className={`aspect-square border-b border-r border-white/[0.03] flex flex-col items-center justify-start pt-2 pb-1 px-1 transition-all relative group ${
-                      isSel ? "bg-violet-600/15" : "hover:bg-white/3"
+                      isSel ? "bg-amber-600/15" : "hover:bg-white/3"
                     } ${hasFuture ? "cursor-default" : ""}`}
                   >
                     <span className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full transition-all ${
                       isToday
-                        ? "bg-violet-600 text-white"
+                        ? "bg-amber-600 text-white"
                         : isSel
-                        ? "text-violet-300"
+                        ? "text-amber-300"
                         : "text-white/50 group-hover:text-white/80"
                     }`}>
                       {day.getDate()}
@@ -201,7 +201,7 @@ export default function CalendarPage() {
                             href={`/jobs/${job.id}`}
                             className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <ExternalLink className="w-3.5 h-3.5 text-violet-400" />
+                            <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
                           </Link>
                         )}
                       </div>

@@ -14,7 +14,7 @@ function PlanBadge({ plan }: Readonly<{ plan: string }>) {
     plan === "pro"
       ? "bg-amber-500/15 text-amber-400 border-amber-500/25"
       : plan === "starter"
-      ? "bg-violet-500/15 text-violet-300 border-violet-500/25"
+      ? "bg-amber-500/15 text-amber-300 border-amber-500/25"
       : "bg-white/5 text-white/40 border-white/10";
   return (
     <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold uppercase tracking-wide ${cls}`}>
@@ -136,7 +136,7 @@ export default async function BillingPage() {
             <div className="h-2 rounded-full bg-white/5 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${
-                  usagePct >= 90 ? "bg-red-500" : usagePct >= 70 ? "bg-amber-500" : "bg-violet-500"
+                  usagePct >= 90 ? "bg-red-500" : usagePct >= 70 ? "bg-amber-500" : "bg-amber-500"
                 }`}
                 style={{ width: `${usagePct}%` }}
               />

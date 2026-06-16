@@ -37,7 +37,7 @@ function JoinInner() {
     <div className="glass rounded-2xl p-10 max-w-sm w-full text-center space-y-4">
       {status === "loading" && (
         <>
-          <Loader2 className="w-8 h-8 text-violet-400 animate-spin mx-auto" />
+          <Loader2 className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
           <p className="text-white/60 text-sm">Joining team…</p>
         </>
       )}
@@ -57,7 +57,7 @@ function JoinInner() {
           </div>
           <p className="text-white font-semibold">Unable to join</p>
           <p className="text-white/40 text-sm">{message}</p>
-          <a href="/dashboard" className="text-xs text-violet-400 hover:text-violet-300 transition-colors">Go to dashboard →</a>
+          <a href="/dashboard" className="text-xs text-amber-400 hover:text-amber-300 transition-colors">Go to dashboard →</a>
         </>
       )}
     </div>
@@ -69,7 +69,7 @@ export default function JoinPage() {
     <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--background)" }}>
       <Suspense fallback={
         <div className="glass rounded-2xl p-10 max-w-sm w-full text-center">
-          <Loader2 className="w-8 h-8 text-violet-400 animate-spin mx-auto" />
+          <Loader2 className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
         </div>
       }>
         <JoinInner />

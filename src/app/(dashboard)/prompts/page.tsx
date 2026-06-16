@@ -96,7 +96,7 @@ export default function PromptsPage() {
   if (isPro === null) {
     return (
       <div className="p-8 flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+        <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
       </div>
     );
   }
@@ -107,14 +107,14 @@ export default function PromptsPage() {
         <h1 className="text-2xl font-bold text-white">Custom prompts</h1>
         <p className="text-white/40 mt-1">
           Override the AI instructions for each content format.{" "}
-          <span className="text-violet-400 font-medium">Starter &amp; Pro.</span>
+          <span className="text-amber-400 font-medium">Starter &amp; Pro.</span>
         </p>
       </div>
 
       {!isPro && (
-        <div className="glass rounded-2xl p-8 border border-violet-500/20 mb-8 flex items-start gap-5">
-          <div className="w-10 h-10 rounded-xl bg-violet-900/50 flex items-center justify-center shrink-0">
-            <Lock className="w-5 h-5 text-violet-400" />
+        <div className="glass rounded-2xl p-8 border border-amber-500/20 mb-8 flex items-start gap-5">
+          <div className="w-10 h-10 rounded-xl bg-amber-900/50 flex items-center justify-center shrink-0">
+            <Lock className="w-5 h-5 text-amber-400" />
           </div>
           <div className="flex-1">
             <p className="text-white font-semibold mb-1">Starter &amp; Pro feature</p>
@@ -124,7 +124,7 @@ export default function PromptsPage() {
             </p>
             <Link
               href="/upgrade"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-500 transition-all shadow-lg shadow-violet-900/30"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-500 transition-all shadow-lg shadow-amber-900/30"
             >
               Upgrade to Starter — $19/mo
             </Link>
@@ -147,14 +147,14 @@ export default function PromptsPage() {
                 }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   active
-                    ? "bg-violet-600 text-white shadow-lg shadow-violet-900/40"
+                    ? "bg-amber-600 text-white shadow-lg shadow-amber-900/40"
                     : "text-white/50 hover:text-white hover:bg-white/5"
                 }`}
               >
                 <f.icon className="w-3.5 h-3.5" />
                 {f.label}
                 {hasCustom && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
                 )}
               </button>
             );
@@ -170,7 +170,7 @@ export default function PromptsPage() {
                 {isCustom ? "Custom prompt active" : "Using default prompt"}
               </span>
               {isCustom && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-violet-600/20 text-violet-300 border border-violet-500/20">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-600/20 text-amber-300 border border-amber-500/20">
                   custom
                 </span>
               )}
@@ -187,7 +187,7 @@ export default function PromptsPage() {
               <button
                 onClick={() => void handleSave()}
                 disabled={!isDirty || saveState.saving}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-violet-600 text-white hover:bg-violet-500"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-amber-600 text-white hover:bg-amber-500"
               >
                 {saveState.saving && <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>}
                 {saveState.saved && <><Check className="w-3.5 h-3.5 text-emerald-400" /> Saved</>}

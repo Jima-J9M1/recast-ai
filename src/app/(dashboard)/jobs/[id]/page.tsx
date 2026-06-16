@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState, useCallback, useRef } from "react";
-import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw, Save, MessageSquare, SendHorizonal, Star, AtSign } from "lucide-react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw, Save, MessageSquare, SendHorizonal, Star, AtSign, Pencil, Link2 } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -28,7 +28,7 @@ const TONE_LABELS: Record<string, string> = {
 };
 
 function getTabClass(active: boolean, has: boolean): string {
-  if (active) return "bg-violet-600 text-white shadow-lg shadow-violet-900/40";
+  if (active) return "bg-amber-600 text-white shadow-lg shadow-amber-900/40";
   if (has)    return "text-white/50 hover:text-white hover:bg-white/5";
   return "text-white/20 cursor-not-allowed";
 }
@@ -38,6 +38,27 @@ function getStatusBadge(status: string) {
   if (status === "failed")    return "bg-red-500/10 text-red-400 border border-red-500/20";
   if (status === "cancelled") return "bg-white/5 text-white/30 border border-white/10";
   return "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+}
+
+const wordCount = (text: string): number =>
+  text.trim().split(/\s+/).filter(Boolean).length;
+
+const readTime = (text: string): string => {
+  const mins = Math.max(1, Math.round(wordCount(text) / 230));
+  return mins === 1 ? "1 min read" : `${mins} min read`;
+};
+
+function stripMarkdown(md: string): string {
+  return md
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/`(.+?)`/g, "$1")
+    .replace(/^[-*+]\s+/gm, "")
+    .replace(/^>\s+/gm, "")
+    .replace(/\[(.+?)\]\(.+?\)/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function CopyButton({ text }: Readonly<{ text: string }>) {
@@ -52,6 +73,57 @@ function CopyButton({ text }: Readonly<{ text: string }>) {
       {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
       {copied ? "Copied!" : "Copy"}
     </button>
+  );
+}
+
+function CopyMarkdownButton({ text }: Readonly<{ text: string }>) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+  return (
+    <button onClick={copy} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/40 hover:text-white text-xs transition-all hover:bg-white/5" title="Copy as Markdown">
+      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <span className="font-mono font-bold text-[10px]">MD</span>}
+      {copied ? "Copied!" : "Markdown"}
+    </button>
+  );
+}
+
+function ShareButton({ jobId }: Readonly<{ jobId: string }>) {
+  const [copied, setCopied] = useState(false);
+  async function share() {
+    const url = `${location.origin}/share/${jobId}`;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  }
+  return (
+    <button onClick={share} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/40 hover:text-white text-xs transition-all hover:bg-white/5">
+      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Link2 className="w-3.5 h-3.5" />}
+      {copied ? "Link copied!" : "Share"}
+    </button>
+  );
+}
+
+function BlogMeta({ text }: Readonly<{ text: string }>) {
+  const wc = text.trim().split(/\s+/).filter(Boolean).length;
+  const mins = Math.max(1, Math.round(wc / 230));
+  return (
+    <p className="text-xs text-white/25 mb-4 tabular-nums">
+      {wc} words · {mins === 1 ? "1 min read" : `${mins} min read`}
+    </p>
+  );
+}
+
+function LinkedInCharCount({ content }: Readonly<{ content: string }>) {
+  const len = content.length;
+  const over = len > 3000;
+  return (
+    <p className={`text-xs mb-4 tabular-nums ${over ? "text-red-400" : "text-white/25"}`}>
+      {len} / 3,000 chars{over ? " · may be cut off in feed" : ""}
+    </p>
   );
 }
 
@@ -129,7 +201,7 @@ function VersionPicker({ versions, currentVersion, onSelect, onRestore, restorin
       <button
         onClick={() => setOpen((v) => !v)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
-          open ? "bg-violet-600/20 text-violet-300 border border-violet-500/30" : "glass text-white/50 hover:text-white hover:bg-white/5"
+          open ? "bg-amber-600/20 text-amber-300 border border-amber-500/30" : "glass text-white/50 hover:text-white hover:bg-white/5"
         }`}
       >
         <History className="w-3.5 h-3.5" />
@@ -146,13 +218,13 @@ function VersionPicker({ versions, currentVersion, onSelect, onRestore, restorin
             return (
               <div
                 key={v.version}
-                className={`flex items-center justify-between px-3 py-2.5 hover:bg-white/5 transition-colors ${isViewing ? "bg-violet-600/10" : ""}`}
+                className={`flex items-center justify-between px-3 py-2.5 hover:bg-white/5 transition-colors ${isViewing ? "bg-amber-600/10" : ""}`}
               >
                 <button
                   onClick={() => { onSelect(v.version); setOpen(false); }}
                   className="flex items-center gap-2 text-sm text-left flex-1 min-w-0"
                 >
-                  <span className={`font-medium ${isViewing ? "text-violet-300" : "text-white/70"}`}>
+                  <span className={`font-medium ${isViewing ? "text-amber-300" : "text-white/70"}`}>
                     v{v.version}
                   </span>
                   {isNewest && <span className="text-xs text-white/30">latest</span>}
@@ -162,7 +234,7 @@ function VersionPicker({ versions, currentVersion, onSelect, onRestore, restorin
                   <button
                     onClick={() => { onRestore(v.version); setOpen(false); }}
                     disabled={restoring}
-                    className="flex items-center gap-1 text-xs text-white/30 hover:text-violet-300 transition-colors disabled:opacity-40 shrink-0"
+                    className="flex items-center gap-1 text-xs text-white/30 hover:text-amber-300 transition-colors disabled:opacity-40 shrink-0"
                     title="Restore this version"
                   >
                     <RotateCcw className="w-3 h-3" /> Restore
@@ -266,7 +338,7 @@ function ChatPanel({ jobId }: ChatPanelProps) {
   return (
     <div className="glass rounded-2xl flex flex-col" style={{ height: "65vh" }}>
       <div className="flex items-center gap-2 px-5 py-3.5 border-b border-white/5 shrink-0">
-        <MessageSquare className="w-4 h-4 text-violet-400" />
+        <MessageSquare className="w-4 h-4 text-amber-400" />
         <span className="text-sm font-medium text-white/70">Chat with transcript</span>
         <span className="text-xs text-white/25 ml-auto">Ask anything about this content</span>
       </div>
@@ -274,8 +346,8 @@ function ChatPanel({ jobId }: ChatPanelProps) {
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-            <div className="w-12 h-12 rounded-full bg-violet-900/30 flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-violet-400/60" />
+            <div className="w-12 h-12 rounded-full bg-amber-900/30 flex items-center justify-center">
+              <MessageSquare className="w-5 h-5 text-amber-400/60" />
             </div>
             <p className="text-sm text-white/30">Ask anything about the transcript</p>
             <div className="flex flex-wrap justify-center gap-2 mt-1">
@@ -297,7 +369,7 @@ function ChatPanel({ jobId }: ChatPanelProps) {
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
               msg.role === "user"
-                ? "bg-violet-600 text-white rounded-br-sm"
+                ? "bg-amber-600 text-white rounded-br-sm"
                 : "bg-white/5 border border-white/8 text-white/80 rounded-bl-sm"
             }`}>
               {msg.content}
@@ -308,7 +380,7 @@ function ChatPanel({ jobId }: ChatPanelProps) {
         {sending && (
           <div className="flex justify-start">
             <div className="bg-white/5 border border-white/8 rounded-2xl rounded-bl-sm px-4 py-2.5">
-              <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
+              <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
             </div>
           </div>
         )}
@@ -316,7 +388,7 @@ function ChatPanel({ jobId }: ChatPanelProps) {
       </div>
 
       <div className="shrink-0 px-4 py-3 border-t border-white/5">
-        <div className="flex items-center gap-2 bg-white/5 rounded-xl border border-white/8 px-4 py-2.5 focus-within:border-violet-500/40 transition-all">
+        <div className="flex items-center gap-2 bg-white/5 rounded-xl border border-white/8 px-4 py-2.5 focus-within:border-amber-500/40 transition-all">
           <input
             type="text"
             value={input}
@@ -330,7 +402,7 @@ function ChatPanel({ jobId }: ChatPanelProps) {
             type="button"
             onClick={() => void send()}
             disabled={!input.trim() || sending}
-            className="shrink-0 w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center hover:bg-violet-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            className="shrink-0 w-7 h-7 rounded-lg bg-amber-600 flex items-center justify-center hover:bg-amber-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <SendHorizonal className="w-3.5 h-3.5 text-white" />
           </button>
@@ -356,6 +428,9 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [previewing, setPreviewing]         = useState(false);
   const [saving, setSaving]                 = useState(false);
+  const [editMode, setEditMode]             = useState(false);
+  const [editedContent, setEditedContent]   = useState("");
+  const [editSaving, setEditSaving]         = useState(false);
   const [showChat, setShowChat]             = useState(false);
   const [starredIds, setStarredIds]         = useState<Set<string>>(new Set());
   const [outputLoadError, setOutputLoadError] = useState(false);
@@ -427,6 +502,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
 
   function switchTab(tab: Output["type"]) {
     setActiveTab(tab);
+    setEditMode(false);
     setRefineOpen(false);
     setRefineInstruction("");
     setPreviewContent(null);
@@ -549,7 +625,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+        <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
       </div>
     );
   }
@@ -570,7 +646,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
             {job.title ?? job.source_url ?? "Untitled"}
           </h1>
           {job.source_url && (
-            <a href={job.source_url} target="_blank" rel="noopener noreferrer" className="text-xs text-white/30 hover:text-violet-400 transition-colors truncate block mt-0.5">
+            <a href={job.source_url} target="_blank" rel="noopener noreferrer" className="text-xs text-white/30 hover:text-amber-400 transition-colors truncate block mt-0.5">
               {job.source_url}
             </a>
           )}
@@ -599,32 +675,72 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
         </div>
       </div>
 
-      {/* Processing */}
-      {isProcessing && (
-        <div className="glass rounded-2xl p-12 text-center mb-6">
-          <div className="relative w-14 h-14 mx-auto mb-5">
-            <div className="absolute inset-0 rounded-full border-2 border-violet-500/20" />
-            <div className="absolute inset-0 rounded-full border-2 border-t-violet-500 animate-spin" />
-            <div className="absolute inset-2 rounded-full bg-violet-900/30 flex items-center justify-center">
-              <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
+      {/* Processing — step-by-step progress */}
+      {isProcessing && (() => {
+        const isTranscribing = job.status === "transcribing" || job.status === "pending";
+        const isGenerating = job.status === "generating";
+        type Step = { label: string; detail: string; done: boolean; active: boolean };
+        const steps: Step[] = [
+          { label: "Job queued",          detail: "Waiting to start",                       done: !isTranscribing,  active: job.status === "pending" },
+          { label: "Fetching transcript", detail: "Extracting captions from your video",    done: isGenerating,     active: job.status === "transcribing" },
+          { label: "Reading with GPT-4o", detail: "Analyzing your content",                 done: false,            active: isGenerating },
+          { label: "Blog post",           detail: "SEO-optimized long-form article",        done: false,            active: isGenerating },
+          { label: "Twitter thread",      detail: "Viral hook + engaging thread",           done: false,            active: isGenerating },
+          { label: "LinkedIn post",       detail: "Professional B2B reach",                done: false,            active: isGenerating },
+          { label: "Newsletter",          detail: "Ready-to-send email with subject line",  done: false,            active: isGenerating },
+        ];
+        const activeIdx = steps.findIndex((s) => s.active);
+        return (
+          <div className="glass rounded-2xl p-7 mb-6">
+            <div className="flex items-start gap-3 mb-7">
+              <div className="relative w-8 h-8 shrink-0 mt-0.5">
+                <div className="absolute inset-0 rounded-full border-2 border-amber-500/20" />
+                <div className="absolute inset-0 rounded-full border-2 border-t-amber-500 animate-spin" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-semibold text-sm">
+                  {isTranscribing ? "Fetching transcript…" : "Generating your content…"}
+                </p>
+                <p className="text-white/30 text-xs mt-0.5">Usually takes 30–60 seconds</p>
+              </div>
+              <button
+                onClick={handleStop}
+                disabled={stopping}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-red-500/10 border border-white/8 hover:border-red-500/20 text-white/30 hover:text-red-400 text-xs transition-all disabled:opacity-40 shrink-0"
+              >
+                <Square className="w-3 h-3" />
+                {stopping ? "Stopping…" : "Stop"}
+              </button>
+            </div>
+            <div className="space-y-3 pl-1">
+              {steps.map((step, idx) => {
+                const isPending = !step.done && !step.active && idx > activeIdx;
+                return (
+                  <div key={step.label} className={"flex items-center gap-3 " + (isPending ? "opacity-25" : "")}>
+                    <div className="w-5 h-5 shrink-0 flex items-center justify-center">
+                      {step.done ? (
+                        <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 text-white" />
+                        </div>
+                      ) : step.active ? (
+                        <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+                      ) : (
+                        <div className="w-3 h-3 rounded-full border border-white/15" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={"text-sm " + (step.done ? "text-white/40" : step.active ? "text-white font-medium" : "text-white/30")}>
+                        {step.label}
+                      </p>
+                    </div>
+                    {step.active && <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />}
+                  </div>
+                );
+              })}
             </div>
           </div>
-          <p className="text-white font-semibold text-lg mb-1">
-            {job.status === "transcribing" ? "Fetching transcript…" : "Generating content…"}
-          </p>
-          <p className="text-white/30 text-sm mb-6">
-            {job.status === "transcribing" ? "Reading the video captions" : "Writing your blog, thread, LinkedIn post & newsletter"}
-          </p>
-          <button
-            onClick={handleStop}
-            disabled={stopping}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/20 text-white/40 hover:text-red-400 text-sm transition-all disabled:opacity-40"
-          >
-            <Square className="w-3.5 h-3.5" />
-            {stopping ? "Stopping…" : "Stop job"}
-          </button>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Failed */}
       {job.status === "failed" && (
@@ -691,7 +807,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                 onClick={() => setShowChat(true)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   showChat
-                    ? "bg-violet-600 text-white shadow-lg shadow-violet-900/40"
+                    ? "bg-amber-600 text-white shadow-lg shadow-amber-900/40"
                     : "text-white/50 hover:text-white hover:bg-white/5"
                 }`}
               >
@@ -721,7 +837,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                       <button
                         onClick={() => void handleSavePreview()}
                         disabled={saving}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-semibold hover:bg-violet-500 transition-all disabled:opacity-40"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-500 transition-all disabled:opacity-40"
                       >
                         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                         {saving ? "Saving…" : "Save"}
@@ -748,7 +864,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                           disabled={regenerating || previewing}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all disabled:opacity-40 ${
                             refineOpen
-                              ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+                              ? "bg-amber-600/20 text-amber-300 border border-amber-500/30"
                               : "glass text-white/50 hover:text-white hover:bg-white/5"
                           }`}
                         >
@@ -765,8 +881,20 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                       </>
                     )
                   )}
-                  <CopyButton text={previewContent ?? activeOutput.content} />
+                  <CopyButton text={activeTab === "twitter_thread" ? (previewContent ?? activeOutput.content) : stripMarkdown(previewContent ?? activeOutput.content)} />
+                  {activeTab !== "twitter_thread" && (
+                    <CopyMarkdownButton text={previewContent ?? activeOutput.content} />
+                  )}
                   <DownloadButton text={previewContent ?? activeOutput.content} filename={`${activeTab}-${id.slice(0, 8)}.md`} />
+                  {previewContent === null && !editMode && (
+                    <button
+                      onClick={() => { setEditedContent(activeOutput.content); setEditMode(true); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/50 hover:text-amber-400 text-xs transition-all hover:bg-white/5"
+                    >
+                      <Pencil className="w-3.5 h-3.5" /> Edit
+                    </button>
+                  )}
+                  <ShareButton jobId={id} />
                   {previewContent === null && (
                     <StarButton outputId={activeOutput.id} starred={starredIds.has(activeOutput.id)} onToggle={(id, starred) => setStarredIds((prev) => { const next = new Set(prev); starred ? next.add(id) : next.delete(id); return next; })} />
                   )}
@@ -774,7 +902,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
               </div>
 
               {refineOpen && activeTab !== "extras" && previewContent === null && (
-                <div className="flex items-center gap-2 px-6 py-3 border-b border-white/5 bg-violet-500/5">
+                <div className="flex items-center gap-2 px-6 py-3 border-b border-white/5 bg-amber-500/5">
                   <input
                     type="text"
                     value={refineInstruction}
@@ -787,7 +915,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                   <button
                     onClick={() => void handlePreviewRefine(refineInstruction)}
                     disabled={!refineInstruction.trim() || previewing}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium hover:bg-violet-500 transition-all disabled:opacity-40"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-medium hover:bg-amber-500 transition-all disabled:opacity-40"
                   >
                     {previewing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</> : "Apply"}
                   </button>
@@ -798,6 +926,13 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
               )}
 
               <div className={`p-7 overflow-auto max-h-[65vh] transition-opacity ${regenerating || restoring || previewing || saving ? "opacity-40 pointer-events-none" : ""}`}>
+                {/* Word count for blog, char count for LinkedIn */}
+                {!editMode && activeTab === "blog" && (
+                  <BlogMeta text={previewContent ?? activeOutput.content} />
+                )}
+                {!editMode && activeTab === "linkedin" && (
+                  <LinkedInCharCount content={previewContent ?? activeOutput.content} />
+                )}
                 {job.seo_mode && activeTab === "blog" && (() => {
                   const seo = parseSeoMeta(activeOutput.content);
                   return seo ? (
@@ -814,7 +949,59 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                     </div>
                   ) : null;
                 })()}
-                {activeTab === "twitter_thread" ? (
+                {editMode ? (
+                  <div className="flex flex-col gap-3">
+                    <textarea
+                      value={editedContent}
+                      onChange={(e) => setEditedContent(e.target.value)}
+                      className="w-full min-h-[420px] bg-white/3 border border-amber-500/20 rounded-xl p-4 text-sm text-white/85 leading-relaxed resize-y focus:outline-none focus:border-amber-500/50 transition-all font-mono"
+                      spellCheck={false}
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={async () => {
+                          if (!editedContent.trim()) return;
+                          setEditSaving(true);
+                          try {
+                            const res = await fetch(`/api/jobs/${id}/save-output`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ format: activeTab, content: editedContent }),
+                            });
+                            if (res.ok) {
+                              const { version } = await res.json() as { version: number };
+                              const newOutput: Output = {
+                                id: crypto.randomUUID(),
+                                job_id: id,
+                                type: activeTab,
+                                content: editedContent,
+                                version,
+                                created_at: new Date().toISOString(),
+                              };
+                              setOutputs((prev) => [...prev, newOutput]);
+                              setViewingVersions((prev) => ({ ...prev, [activeTab]: version }));
+                              setEditMode(false);
+                            }
+                          } finally {
+                            setEditSaving(false);
+                          }
+                        }}
+                        disabled={editSaving || !editedContent.trim()}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 text-white text-xs font-semibold hover:bg-amber-500 transition-all disabled:opacity-40"
+                      >
+                        {editSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        {editSaving ? "Saving…" : "Save as new version"}
+                      </button>
+                      <button
+                        onClick={() => setEditMode(false)}
+                        className="px-4 py-2 rounded-xl text-white/40 hover:text-white/70 text-xs transition-all hover:bg-white/5"
+                      >
+                        Cancel
+                      </button>
+                      <span className="ml-auto text-xs text-white/20 tabular-nums">{editedContent.length} chars</span>
+                    </div>
+                  </div>
+                ) : activeTab === "twitter_thread" ? (
                   <TwitterThreadView content={previewContent ?? activeOutput.content} />
                 ) : (
                   <div className="prose-dark">

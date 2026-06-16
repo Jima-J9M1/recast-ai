@@ -73,7 +73,7 @@ export function WebhookSettings() {
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">Webhooks</h2>
         {!showForm && (
-          <button onClick={() => setShowForm(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 text-violet-300 text-xs font-medium hover:bg-violet-600/30 transition-all">
+          <button onClick={() => setShowForm(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600/20 text-amber-300 text-xs font-medium hover:bg-amber-600/30 transition-all">
             <Plus className="w-3.5 h-3.5" /> Add webhook
           </button>
         )}
@@ -92,7 +92,7 @@ export function WebhookSettings() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://your-server.com/webhook"
-              className="w-full px-3 py-2.5 rounded-lg bg-white/5 border border-white/8 text-white text-sm placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-all"
+              className="w-full px-3 py-2.5 rounded-lg bg-white/5 border border-white/8 text-white text-sm placeholder-white/20 focus:outline-none focus:border-amber-500/50 transition-all"
             />
           </div>
           <div>
@@ -102,13 +102,13 @@ export function WebhookSettings() {
               value={secret}
               onChange={(e) => setSecret(e.target.value)}
               placeholder="Sent as X-RecastAI-Secret header"
-              className="w-full px-3 py-2.5 rounded-lg bg-white/5 border border-white/8 text-white text-sm placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-all"
+              className="w-full px-3 py-2.5 rounded-lg bg-white/5 border border-white/8 text-white text-sm placeholder-white/20 focus:outline-none focus:border-amber-500/50 transition-all"
             />
           </div>
           {error && <p className="text-xs text-red-400">{error}</p>}
           <div className="flex gap-2">
             <button onClick={() => void add()} disabled={adding || !url.trim()}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 text-white text-xs font-semibold hover:bg-violet-500 transition-all disabled:opacity-40">
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-500 transition-all disabled:opacity-40">
               {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
               {adding ? "Adding…" : "Add"}
             </button>
@@ -121,7 +121,7 @@ export function WebhookSettings() {
 
       {loading ? (
         <div className="flex items-center justify-center h-16">
-          <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
+          <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
         </div>
       ) : webhooks.length === 0 ? (
         <div className="flex items-center gap-2 py-6 text-center justify-center">

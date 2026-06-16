@@ -12,7 +12,7 @@ const ALLOWED_TYPES = new Set([
   "audio/mp4", "audio/x-m4a", "audio/m4a",
   "audio/ogg", "audio/webm", "audio/flac", "audio/x-flac",
 ]);
-const MAX_BYTES = 4 * 1024 * 1024; // 4 MB
+const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 
 async function transcribeAudio(buffer: Buffer, filename: string, mimeType: string): Promise<string> {
   const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (file.size > MAX_BYTES) {
-    return Response.json({ error: "File too large. Maximum size is 4 MB." }, { status: 413 });
+    return Response.json({ error: "File too large. Maximum size is 25 MB." }, { status: 413 });
   }
 
   const tone: ToneStyle = VALID_TONES.has(formData.get("tone") as ToneStyle)

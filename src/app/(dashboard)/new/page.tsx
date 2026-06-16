@@ -25,9 +25,16 @@ const TONES: { value: ToneStyle; label: string; emoji: string; desc: string }[] 
   { value: "humorous",     label: "Humorous",     emoji: "😄", desc: "Witty & playful" },
 ];
 
+const STYLE_PRESETS: { label: string; tone: ToneStyle; emoji: string; hint: string }[] = [
+  { label: "Direct & Bold",    tone: "professional", emoji: "⚡", hint: "Short punchy sentences. Cut the fluff." },
+  { label: "Newsletter Writer", tone: "casual",       emoji: "✉️", hint: "Conversational, like writing to a friend." },
+  { label: "Thought Leader",   tone: "professional", emoji: "🎯", hint: "Data-driven insights with strong opinions." },
+  { label: "Educator",         tone: "educational",  emoji: "🧑‍🏫", hint: "Break complex ideas into clear steps." },
+];
+
 type InputMode = "youtube" | "audio" | "voice" | "batch";
 
-const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 const YT_PATTERN = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/;
 
 function isYouTubeUrl(url: string): boolean {
@@ -47,18 +54,18 @@ async function loadUserData(userId: string): Promise<{ creditsLeft: number | nul
   return { creditsLeft, plan };
 }
 
-async function submitYouTubeJob(url: string, tone: ToneStyle, language: Language, seoMode: boolean): Promise<string> {
+async function submitYouTubeJob(url: string, tone: ToneStyle, language: Language, seoMode: boolean, styleHint: string = ""): Promise<string> {
   const res = await fetch("/api/process", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, tone, language, seo_mode: seoMode }),
+    body: JSON.stringify({ url, tone, language, seo_mode: seoMode, style_hint: styleHint }),
   });
   const data = await res.json() as { jobId?: string; error?: string };
   if (!res.ok) throw new Error(data.error ?? "Something went wrong");
   return data.jobId ?? "";
 }
 
-async function submitAudioJob(file: File, tone: ToneStyle, language: Language, seoMode: boolean): Promise<string> {
+async function submitAudioJob(file: File, tone: ToneStyle, language: Language, seoMode: boolean, styleHint: string = ""): Promise<string> {
   const form = new FormData();
   form.append("file", file);
   form.append("tone", tone);
@@ -172,9 +179,9 @@ function VoiceRecorder({ onFileReady, loading }: VoiceRecorderProps) {
     return (
       <div>
         <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Voice Recording</p>
-        <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-5 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-violet-600/30 flex items-center justify-center shrink-0">
-            <Check className="w-5 h-5 text-violet-400" />
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-amber-600/30 flex items-center justify-center shrink-0">
+            <Check className="w-5 h-5 text-amber-400" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-white">Recording ready</p>
@@ -201,7 +208,7 @@ function VoiceRecorder({ onFileReady, loading }: VoiceRecorderProps) {
         type="button"
         onClick={() => void startRecording()}
         disabled={loading}
-        className="w-full flex flex-col items-center gap-3 py-10 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/40 hover:bg-violet-500/5 transition-all disabled:opacity-50"
+        className="w-full flex flex-col items-center gap-3 py-10 rounded-xl border-2 border-dashed border-white/10 hover:border-amber-500/40 hover:bg-amber-500/5 transition-all disabled:opacity-50"
       >
         <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
           <Mic className="w-6 h-6 text-white/40" />
@@ -257,7 +264,7 @@ function BatchInput({
           <div className="flex flex-col items-center gap-3 py-8 rounded-xl border border-white/8 bg-white/2 text-center">
             <Layers className="w-6 h-6 text-white/20" />
             <p className="text-sm text-white/40">Batch processing requires a Starter or Pro plan.</p>
-            <Link href="/upgrade" className="text-xs text-violet-400 hover:text-violet-300 font-semibold transition-colors">
+            <Link href="/upgrade" className="text-xs text-amber-400 hover:text-amber-300 font-semibold transition-colors">
               Upgrade to Starter — $19/mo →
             </Link>
           </div>
@@ -269,7 +276,7 @@ function BatchInput({
               disabled={loading}
               rows={6}
               placeholder={"https://youtube.com/watch?v=xxx\nhttps://youtu.be/yyy\nhttps://youtube.com/watch?v=zzz"}
-              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/20 focus:outline-none focus:border-violet-500/60 transition-all disabled:opacity-50 text-sm font-mono resize-none"
+              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/20 focus:outline-none focus:border-amber-500/60 transition-all disabled:opacity-50 text-sm font-mono resize-none"
             />
             <p className="mt-2 text-xs text-white/25">
               One URL per line · {parsedCount} valid URL{parsedCount === 1 ? "" : "s"} · max {batchLimit} per batch
@@ -303,9 +310,9 @@ function BatchInput({
                       disabled={disabled || loading || isPrimary}
                       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                         isPrimary
-                          ? "bg-violet-600/20 border border-violet-500/30 text-violet-300 cursor-default"
+                          ? "bg-amber-600/20 border border-amber-500/30 text-amber-300 cursor-default"
                           : selected
-                          ? "bg-violet-600/20 border border-violet-500/40 text-violet-200"
+                          ? "bg-amber-600/20 border border-amber-500/40 text-amber-200"
                           : "bg-white/3 border border-white/8 text-white/40 hover:text-white/70 disabled:opacity-30 disabled:cursor-not-allowed"
                       }`}
                     >
@@ -316,7 +323,7 @@ function BatchInput({
                 })}
               </div>
               {extraLanguages.length > 0 && parsedCount > 0 && (
-                <p className="mt-2 text-xs text-violet-300/70">
+                <p className="mt-2 text-xs text-amber-300/70">
                   {parsedCount} URL{parsedCount !== 1 ? "s" : ""} × {1 + extraLanguages.length} languages = <span className="font-semibold">{totalJobs} jobs</span>
                 </p>
               )}
@@ -325,7 +332,7 @@ function BatchInput({
           ) : (
             <div className="px-3 py-2.5 rounded-xl bg-white/3 border border-white/8 text-xs text-white/30 flex items-center justify-between">
               Generate the same content in multiple languages at once
-              <Link href="/billing" className="text-violet-400 hover:text-violet-300 font-semibold transition-colors ml-2 shrink-0">Upgrade →</Link>
+              <Link href="/billing" className="text-amber-400 hover:text-amber-300 font-semibold transition-colors ml-2 shrink-0">Upgrade →</Link>
             </div>
           )}
         </div>
@@ -357,7 +364,7 @@ function ToneSelector({ value, onChange, disabled }: ToneSelectorProps) {
               disabled={disabled}
               className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border text-center transition-all disabled:opacity-40 ${
                 active
-                  ? "bg-violet-600/20 border-violet-500/40 text-violet-300"
+                  ? "bg-amber-600/20 border-amber-500/40 text-amber-300"
                   : "bg-white/3 border-white/8 text-white/40 hover:text-white/70 hover:bg-white/6 hover:border-white/15"
               }`}
             >
@@ -384,7 +391,7 @@ interface AudioDropZoneProps {
 
 function AudioDropZone({ file, inputRef, onChange, onOpen, loading }: AudioDropZoneProps) {
   const tooLarge  = file !== null && file.size > MAX_AUDIO_BYTES;
-  const dropClass = file ? "border-violet-500/40 bg-violet-500/5" : "border-white/10 hover:border-white/20 hover:bg-white/3";
+  const dropClass = file ? "border-amber-500/40 bg-amber-500/5" : "border-white/10 hover:border-white/20 hover:bg-white/3";
   return (
     <div>
       <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Audio File</p>
@@ -399,13 +406,13 @@ function AudioDropZone({ file, inputRef, onChange, onOpen, loading }: AudioDropZ
           <>
             <p className="text-sm text-white/80 font-medium">{file.name}</p>
             <p className={`text-xs ${tooLarge ? "text-red-400" : "text-white/40"}`}>
-              {(file.size / 1024 / 1024).toFixed(1)} MB{tooLarge ? " — too large (max 4 MB)" : ""}
+              {(file.size / 1024 / 1024).toFixed(1)} MB{tooLarge ? " — too large (max 25 MB)" : ""}
             </p>
           </>
         ) : (
           <>
             <p className="text-sm text-white/50">Click to select or drag and drop</p>
-            <p className="text-xs text-white/25">MP3, M4A, WAV, OGG, FLAC, WebM · max 4 MB</p>
+            <p className="text-xs text-white/25">MP3, M4A, WAV, OGG, FLAC, WebM · max 25 MB</p>
           </>
         )}
       </button>
@@ -434,7 +441,7 @@ interface SeoToggleProps {
 
 function SeoToggle({ checked, onToggle, disabled }: SeoToggleProps) {
   const desc       = checked ? "Blog will include focus keyword, meta description & FAQ" : "Adds SEO structure to the blog post only";
-  const trackClass = checked ? "bg-violet-600" : "bg-white/10";
+  const trackClass = checked ? "bg-amber-600" : "bg-white/10";
   const thumbClass = checked ? "translate-x-5" : "translate-x-0";
   return (
     <div className="flex items-center justify-between py-1">
@@ -464,8 +471,8 @@ function OutputPreview() {
       <div className="grid grid-cols-2 gap-3">
         {OUTPUT_TYPES.map((t) => (
           <div key={t.label} className="glass rounded-xl p-4 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-violet-900/50 flex items-center justify-center shrink-0 mt-0.5">
-              <t.icon className="w-4 h-4 text-violet-400" />
+            <div className="w-8 h-8 rounded-lg bg-amber-900/50 flex items-center justify-center shrink-0 mt-0.5">
+              <t.icon className="w-4 h-4 text-amber-400" />
             </div>
             <div>
               <p className="text-sm font-semibold text-white/80">{t.label}</p>
@@ -474,9 +481,9 @@ function OutputPreview() {
           </div>
         ))}
       </div>
-      <div className="mt-4 px-4 py-3 rounded-xl bg-violet-500/8 border border-violet-500/15 flex items-center gap-2">
-        <ArrowRight className="w-3.5 h-3.5 text-violet-400 shrink-0" />
-        <p className="text-xs text-violet-300">Results are ready in ~30 seconds. You&apos;ll be taken there automatically.</p>
+      <div className="mt-4 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/15 flex items-center gap-2">
+        <ArrowRight className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+        <p className="text-xs text-amber-300">Results are ready in ~30 seconds. You&apos;ll be taken there automatically.</p>
       </div>
     </div>
   );
@@ -504,17 +511,34 @@ export default function NewPage() {
 
   const [inputMode, setInputMode]     = useState<InputMode>("youtube");
   const [url, setUrl]                 = useState("");
+  const [videoPreview, setVideoPreview] = useState<{ title: string; channel: string; thumbnail: string } | null | "loading">(null);
   const [audioFile, setAudioFile]     = useState<File | null>(null);
   const [voiceFile, setVoiceFile]     = useState<File | null>(null);
   const [batchUrls, setBatchUrls]     = useState("");
   const [extraLangs, setExtraLangs]   = useState<Language[]>([]);
   const [tone, setTone]               = useState<ToneStyle>("professional");
+  const [styleHint, setStyleHint]     = useState("");
   const [language, setLanguage]       = useState<Language>("English");
   const [seoMode, setSeoMode]         = useState(false);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState("");
   const [creditsLeft, setCreditsLeft] = useState<number | null>(null);
   const [userPlan, setUserPlan]       = useState<Plan>("free");
+
+  useEffect(() => {
+    if (!isYouTubeUrl(url)) { setVideoPreview(null); return; }
+    setVideoPreview("loading");
+    const t = setTimeout(() => {
+      fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((d: { title?: string; author_name?: string; thumbnail_url?: string } | null) => {
+          if (d?.title) setVideoPreview({ title: d.title, channel: d.author_name ?? "", thumbnail: d.thumbnail_url ?? "" });
+          else setVideoPreview(null);
+        })
+        .catch(() => setVideoPreview(null));
+    }, 500);
+    return () => clearTimeout(t);
+  }, [url]);
 
   useEffect(() => {
     async function init() {
@@ -554,8 +578,8 @@ export default function NewPage() {
 
     const fileForAudio = inputMode === "voice" ? voiceFile! : audioFile!;
     const job = inputMode === "youtube"
-      ? submitYouTubeJob(url, tone, language, seoMode)
-      : submitAudioJob(fileForAudio, tone, language, seoMode);
+      ? submitYouTubeJob(url, tone, language, seoMode, styleHint)
+      : submitAudioJob(fileForAudio, tone, language, seoMode, styleHint);
 
     job
       .then((jobId) => router.push(`/jobs/${jobId}`))
@@ -577,7 +601,7 @@ export default function NewPage() {
 
   function tabClass(mode: InputMode) {
     return inputMode === mode
-      ? "bg-violet-600 text-white shadow"
+      ? "bg-amber-600 text-white shadow"
       : "text-white/40 hover:text-white/70";
   }
 
@@ -641,12 +665,37 @@ export default function NewPage() {
                   disabled={loading}
                   required
                   id="youtube-url"
-                  className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/25 focus:outline-none focus:border-violet-500/60 transition-all disabled:opacity-50 text-sm"
+                  className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/25 focus:outline-none focus:border-amber-500/60 transition-all disabled:opacity-50 text-sm"
                   placeholder="https://youtube.com/watch?v=..."
                 />
                 {isYouTubeUrl(url) && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-emerald-400" />}
               </div>
               <p className="mt-2 text-xs text-white/25">Requires a video with auto-generated or manual captions.</p>
+              {videoPreview === "loading" && (
+                <div className="mt-3 flex items-center gap-3 p-3 rounded-xl bg-white/3 border border-white/6 animate-pulse">
+                  <div className="w-16 h-10 rounded-lg bg-white/8 shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-white/8 rounded w-3/4" />
+                    <div className="h-2.5 bg-white/5 rounded w-1/2" />
+                  </div>
+                </div>
+              )}
+              {videoPreview && videoPreview !== "loading" && (
+                <div className="mt-3 flex items-center gap-3 p-3 rounded-xl bg-white/3 border border-amber-500/15 transition-all">
+                  {videoPreview.thumbnail && (
+                    <img
+                      src={videoPreview.thumbnail}
+                      alt=""
+                      className="w-16 h-10 rounded-lg object-cover shrink-0 bg-white/5"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white/90 truncate">{videoPreview.title}</p>
+                    <p className="text-xs text-white/35 truncate mt-0.5">{videoPreview.channel}</p>
+                  </div>
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                </div>
+              )}
             </div>
           )}
 
@@ -680,6 +729,35 @@ export default function NewPage() {
 
           <ToneSelector value={tone} onChange={setTone} disabled={loading} />
 
+            {/* Style presets */}
+            <div>
+              <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Style preset <span className="text-white/25 font-normal normal-case tracking-normal">(optional)</span></p>
+              <div className="grid grid-cols-2 gap-2">
+                {STYLE_PRESETS.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => {
+                      if (styleHint === p.hint) { setStyleHint(""); }
+                      else { setTone(p.tone); setStyleHint(p.hint); }
+                    }}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all disabled:opacity-40 ${
+                      styleHint === p.hint
+                        ? "bg-amber-600/20 border-amber-500/40 text-amber-300"
+                        : "bg-white/3 border-white/8 text-white/40 hover:text-white/70 hover:bg-white/6 hover:border-white/15"
+                    }`}
+                  >
+                    <span className="text-base shrink-0">{p.emoji}</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold truncate">{p.label}</p>
+                      <p className="text-xs opacity-60 truncate">{p.hint}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
           <div>
             <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Output language</p>
             <div className="relative">
@@ -688,15 +766,15 @@ export default function NewPage() {
                 value={language}
                 onChange={(e) => setLanguage(e.target.value as Language)}
                 disabled={loading}
-                className="w-full pl-9 pr-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white text-sm focus:outline-none focus:border-violet-500/60 transition-all appearance-none cursor-pointer disabled:opacity-50"
+                className="w-full pl-9 pr-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white text-sm focus:outline-none focus:border-amber-500/60 transition-all appearance-none cursor-pointer disabled:opacity-50"
               >
                 {LANGUAGES.map((l) => (
-                  <option key={l.code} value={l.code} className="bg-[#0d0d1a]">{l.flag} {l.code}</option>
+                  <option key={l.code} value={l.code} className="bg-[#161310]">{l.flag} {l.code}</option>
                 ))}
               </select>
             </div>
             {language !== "English" && (
-              <p className="mt-2 text-xs text-violet-300/70">
+              <p className="mt-2 text-xs text-amber-300/70">
                 {selectedLang?.flag} All formats will be written in {language}.
               </p>
             )}
@@ -711,7 +789,7 @@ export default function NewPage() {
           <button
             type="submit"
             disabled={loading || !canSubmit}
-            className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-500 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-violet-900/30"
+            className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-amber-600 text-white font-semibold hover:bg-amber-500 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-amber-900/30"
           >
             {loading
               ? <><Loader2 className="w-5 h-5 animate-spin" /> {SUBMIT_LABELS[inputMode]}</>

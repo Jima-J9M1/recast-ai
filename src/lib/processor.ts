@@ -7,6 +7,7 @@ import {
   SEO_BLOG_PROMPT,
   type BrandVoice,
 } from "@/lib/openai";
+import { sendJobCompletedEmail } from "@/lib/email";
 import type { ToneStyle } from "@/types";
 
 export async function generateAndSave(
@@ -26,7 +27,7 @@ export async function generateAndSave(
 
   const [{ data: templates }, { data: userData }] = await Promise.all([
     supabase.from("prompt_templates").select("format, prompt").eq("user_id", userId),
-    supabase.from("users").select("brand_voice").eq("id", userId).single(),
+    supabase.from("users").select("brand_voice, email, email_notifications").eq("id", userId).single(),
   ]);
 
   const customPrompts = Object.fromEntries(
@@ -59,6 +60,9 @@ export async function generateAndSave(
   if (insertError) throw new Error(`Failed to save outputs: ${insertError.message}`);
   await supabase.from("jobs").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", jobId);
   await supabase.rpc("increment_usage", { p_user_id: userId, p_month: currentMonth });
+
+  const ud = userData as { brand_voice?: unknown; email?: string; email_notifications?: boolean } | null;
+  if (ud?.email && ud.email_notifications !== false) void sendJobCompletedEmail(ud.email, title ?? "", jobId);
 
   void fireWebhooks(userId, jobId, title ?? "");
 }

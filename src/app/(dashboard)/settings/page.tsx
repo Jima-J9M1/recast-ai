@@ -6,6 +6,7 @@ import { PLAN_LIMITS, PLAN_PRICES } from "@/types";
 import { ProfileForm } from "@/components/ProfileForm";
 import { ManageSubscriptionButton } from "@/components/ManageSubscriptionButton";
 import { WebhookSettings } from "@/components/WebhookSettings";
+import { NotificationSettings } from "@/components/NotificationSettings";
 
 interface UserStats {
   total_jobs: number;
@@ -20,7 +21,7 @@ interface UserStats {
 function PlanBadge({ plan }: Readonly<{ plan: string }>) {
   const cls =
     plan === "pro" ? "bg-amber-500/15 text-amber-400 border-amber-500/25" :
-    plan === "starter" ? "bg-violet-500/15 text-violet-300 border-violet-500/25" :
+    plan === "starter" ? "bg-amber-500/15 text-amber-300 border-amber-500/25" :
     "bg-white/5 text-white/40 border-white/10";
   return (
     <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold uppercase tracking-wide ${cls}`}>
@@ -47,7 +48,7 @@ export default async function SettingsPage() {
   const currentMonth = new Date().toISOString().slice(0, 7);
 
   const [{ data: profile }, { data: usage }, { data: statsRaw }, { data: monthJobs }] = await Promise.all([
-    supabase.from("users").select("plan, full_name, email, polar_customer_id").eq("id", user.id).single(),
+    supabase.from("users").select("plan, full_name, email, polar_customer_id, email_notifications").eq("id", user.id).single(),
     supabase.from("usage").select("count").eq("user_id", user.id).eq("month", currentMonth).single(),
     supabase.rpc("get_user_stats", { p_user_id: user.id }),
     supabase.from("jobs").select("status").eq("user_id", user.id).eq("created_at", currentMonth),
@@ -122,7 +123,7 @@ export default async function SettingsPage() {
             <div className="h-2 rounded-full bg-white/5 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${
-                  usagePct >= 90 ? "bg-red-500" : usagePct >= 70 ? "bg-amber-500" : "bg-violet-500"
+                  usagePct >= 90 ? "bg-red-500" : usagePct >= 70 ? "bg-amber-500" : "bg-amber-500"
                 }`}
                 style={{ width: `${usagePct}%` }}
               />
@@ -138,7 +139,7 @@ export default async function SettingsPage() {
             </p>
             <Link
               href="/upgrade"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-all shadow-lg shadow-violet-900/30 w-fit"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold transition-all shadow-lg shadow-amber-900/30 w-fit"
             >
               <TrendingUp className="w-4 h-4" /> View upgrade options
             </Link>
@@ -148,7 +149,7 @@ export default async function SettingsPage() {
         {plan === "starter" && !hasPolarSub && (
           <Link
             href="/upgrade"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-all shadow-lg shadow-violet-900/30 w-fit"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold transition-all shadow-lg shadow-amber-900/30 w-fit"
           >
             <Zap className="w-4 h-4" /> Upgrade to Pro
           </Link>
@@ -167,7 +168,7 @@ export default async function SettingsPage() {
             <p className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">This month</p>
             <div className="space-y-2">
               <div className="flex items-center gap-2.5 text-sm">
-                <Zap className="w-4 h-4 text-violet-400 shrink-0" />
+                <Zap className="w-4 h-4 text-amber-400 shrink-0" />
                 <span className="text-white/60">Processed</span>
                 <span className="ml-auto font-semibold text-white">{usedThisMonth}</span>
               </div>
@@ -189,7 +190,7 @@ export default async function SettingsPage() {
             <p className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">All time</p>
             <div className="space-y-2">
               <div className="flex items-center gap-2.5 text-sm">
-                <Zap className="w-4 h-4 text-violet-400 shrink-0" />
+                <Zap className="w-4 h-4 text-amber-400 shrink-0" />
                 <span className="text-white/60">Total jobs</span>
                 <span className="ml-auto font-semibold text-white">{stats?.total_jobs ?? 0}</span>
               </div>
@@ -218,7 +219,10 @@ export default async function SettingsPage() {
         </div>
       </div>
 
-      {/* Section 4 — Webhooks */}
+      {/* Section 4 — Notifications */}
+      <NotificationSettings initialValue={(profile as { email_notifications?: boolean } | null)?.email_notifications !== false} />
+
+      {/* Section 5 — Webhooks */}
       <WebhookSettings />
     </div>
   );

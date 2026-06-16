@@ -55,7 +55,7 @@ export function HistoryFilters() {
           defaultValue={q}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search by title or URL…"
-          className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/25 focus:outline-none focus:border-violet-500/60 transition-all text-sm"
+          className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/8 text-white placeholder-white/25 focus:outline-none focus:border-amber-500/60 transition-all text-sm"
         />
       </div>
 
@@ -67,7 +67,7 @@ export function HistoryFilters() {
               onClick={() => update("status", s.value)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 status === s.value
-                  ? "bg-violet-600 text-white"
+                  ? "bg-amber-600 text-white"
                   : "text-white/40 hover:text-white hover:bg-white/5"
               }`}
             >
@@ -79,21 +79,21 @@ export function HistoryFilters() {
         <select
           value={tone}
           onChange={(e) => update("tone", e.target.value)}
-          className="px-3 py-2 rounded-xl bg-white/5 border border-white/8 text-white/60 text-xs focus:outline-none focus:border-violet-500/60 transition-all appearance-none cursor-pointer"
+          className="px-3 py-2 rounded-xl bg-white/5 border border-white/8 text-white/60 text-xs focus:outline-none focus:border-amber-500/60 transition-all appearance-none cursor-pointer"
         >
           {TONES.map((t) => (
-            <option key={t.value} value={t.value} className="bg-[#0d0d1a]">{t.label}</option>
+            <option key={t.value} value={t.value} className="bg-[#161310]">{t.label}</option>
           ))}
         </select>
 
         <select
           value={language}
           onChange={(e) => update("language", e.target.value)}
-          className="px-3 py-2 rounded-xl bg-white/5 border border-white/8 text-white/60 text-xs focus:outline-none focus:border-violet-500/60 transition-all appearance-none cursor-pointer"
+          className="px-3 py-2 rounded-xl bg-white/5 border border-white/8 text-white/60 text-xs focus:outline-none focus:border-amber-500/60 transition-all appearance-none cursor-pointer"
         >
-          <option value="" className="bg-[#0d0d1a]">Any language</option>
+          <option value="" className="bg-[#161310]">Any language</option>
           {LANGUAGES.map((l) => (
-            <option key={l.code} value={l.code} className="bg-[#0d0d1a]">{l.flag} {l.code}</option>
+            <option key={l.code} value={l.code} className="bg-[#161310]">{l.flag} {l.code}</option>
           ))}
         </select>
 

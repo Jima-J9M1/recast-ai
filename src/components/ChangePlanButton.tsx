@@ -39,7 +39,7 @@ export function ChangePlanButton({ targetPlan, label, highlight }: ChangePlanBut
   }
 
   const btnClass = highlight
-    ? "bg-purple-600 text-white hover:bg-purple-500"
+    ? "bg-amber-600 text-white hover:bg-amber-500"
     : "border border-white/20 text-white hover:bg-white/10";
 
   return (
