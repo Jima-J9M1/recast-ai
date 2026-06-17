@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Loader2, Zap, FileText, Hash, Briefcase, Mail, ArrowRight,
-  Globe, Mic, Upload, Layers, Square, Check, Radio,
+  Globe, Mic, Upload, Layers, Square, Check,
 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -32,7 +32,7 @@ const STYLE_PRESETS: { label: string; tone: ToneStyle; emoji: string; hint: stri
   { label: "Educator",         tone: "educational",  emoji: "🧑‍🏫", hint: "Break complex ideas into clear steps." },
 ];
 
-type InputMode = "youtube" | "audio" | "voice" | "batch";
+type InputMode = "youtube" | "audio" | "batch";
 
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 const YT_PATTERN = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/;
@@ -494,14 +494,12 @@ function OutputPreview() {
 const SUBTITLES: Record<InputMode, string> = {
   youtube: "Paste a YouTube URL — we'll generate 5 content formats in ~30s.",
   audio:   "Upload an audio file — we'll transcribe and generate 5 content formats.",
-  voice:   "Record your voice — speak your ideas, we'll transcribe and generate 5 formats.",
   batch:   "Paste multiple YouTube URLs — we'll process them all in the background.",
 };
 
 const SUBMIT_LABELS: Record<InputMode, string> = {
   youtube: "Submitting job…",
   audio:   "Transcribing…",
-  voice:   "Transcribing…",
   batch:   "Queueing batch…",
 };
 
@@ -513,7 +511,6 @@ export default function NewPage() {
   const [url, setUrl]                 = useState("");
   const [videoPreview, setVideoPreview] = useState<{ title: string; channel: string; thumbnail: string } | null | "loading">(null);
   const [audioFile, setAudioFile]     = useState<File | null>(null);
-  const [voiceFile, setVoiceFile]     = useState<File | null>(null);
   const [batchUrls, setBatchUrls]     = useState("");
   const [extraLangs, setExtraLangs]   = useState<Language[]>([]);
   const [tone, setTone]               = useState<ToneStyle>("professional");
@@ -576,7 +573,7 @@ export default function NewPage() {
       return;
     }
 
-    const fileForAudio = inputMode === "voice" ? voiceFile! : audioFile!;
+    const fileForAudio = audioFile!;
     const job = inputMode === "youtube"
       ? submitYouTubeJob(url, tone, language, seoMode, styleHint)
       : submitAudioJob(fileForAudio, tone, language, seoMode, styleHint);
@@ -597,7 +594,6 @@ export default function NewPage() {
   if (inputMode === "batch")        canSubmit = parsedBatchUrls.length > 0 && batchLimit > 0;
   else if (inputMode === "youtube") canSubmit = isYouTubeUrl(url);
   else if (inputMode === "audio")   canSubmit = audioFile !== null && audioFile.size <= MAX_AUDIO_BYTES;
-  else                              canSubmit = voiceFile !== null;
 
   function tabClass(mode: InputMode) {
     return inputMode === mode
@@ -638,10 +634,6 @@ export default function NewPage() {
             className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${tabClass("audio")}`}>
             <Upload className="w-4 h-4" /> Upload
           </button>
-          <button type="button" onClick={() => switchMode("voice")}
-            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${tabClass("voice")}`}>
-            <Radio className="w-4 h-4" /> Voice
-          </button>
           <button type="button" onClick={() => switchMode("batch")}
             className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${tabClass("batch")}`}>
             <Layers className="w-4 h-4" /> Batch
@@ -670,7 +662,18 @@ export default function NewPage() {
                 />
                 {isYouTubeUrl(url) && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-emerald-400" />}
               </div>
-              <p className="mt-2 text-xs text-white/25">Requires a video with auto-generated or manual captions.</p>
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-xs text-white/25">Requires a video with auto-generated or manual captions.</p>
+                {!url && (
+                  <button
+                    type="button"
+                    onClick={() => setUrl("https://www.youtube.com/watch?v=JqpPLqFPnug")}
+                    className="text-xs text-amber-400/60 hover:text-amber-400 transition-colors shrink-0 ml-3"
+                  >
+                    ↗ Try a sample video
+                  </button>
+                )}
+              </div>
               {videoPreview === "loading" && (
                 <div className="mt-3 flex items-center gap-3 p-3 rounded-xl bg-white/3 border border-white/6 animate-pulse">
                   <div className="w-16 h-10 rounded-lg bg-white/8 shrink-0" />
@@ -709,9 +712,6 @@ export default function NewPage() {
             />
           )}
 
-          {inputMode === "voice" && (
-            <VoiceRecorder onFileReady={setVoiceFile} loading={loading} />
-          )}
 
           {inputMode === "batch" && (
             <BatchInput

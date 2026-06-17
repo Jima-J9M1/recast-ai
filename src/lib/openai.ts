@@ -53,8 +53,24 @@ const MAX_TOKENS: Record<ContentFormat, number> = {
   email_sequence: 1800,
 }
 
-// Groq free tier: ~6k TPM. Keep transcript short so parallel calls don't burst the limit.
-const TRANSCRIPT_LIMIT = 4000
+// Compress long transcripts rather than truncating them.
+// For videos up to ~10 min (10k chars), we pass the full transcript.
+// For longer content, we summarize first so no information is lost.
+const TRANSCRIPT_LIMIT = 10_000
+
+async function compressTranscript(transcript: string): Promise<string> {
+  if (transcript.length <= TRANSCRIPT_LIMIT) return transcript;
+  const response = await openai.chat.completions.create({
+    model: 'llama-3.1-8b-instant',
+    messages: [{
+      role: 'user',
+      content: `Summarize the following transcript into a dense, information-rich summary of 700-900 words. Keep all key points, facts, examples, stories, quotes, and actionable advice. Write in the same voice as the speaker. Do not add interpretation — only compress.\n\nTranscript:\n${transcript.slice(0, 80_000)}`,
+    }],
+    max_tokens: 1200,
+    temperature: 0.3,
+  });
+  return response.choices[0].message.content ?? transcript.slice(0, TRANSCRIPT_LIMIT);
+}
 
 export async function generateContent(
   transcript: string,
@@ -63,13 +79,14 @@ export async function generateContent(
   customPrompt?: string,
   language = 'English'
 ): Promise<string> {
+  const processedTranscript = await compressTranscript(transcript);
   const base = customPrompt ?? DEFAULT_PROMPTS[format]
   const languageInstruction = language === 'English'
     ? ''
     : `\n\nIMPORTANT: Write the entire output in ${language}. Do not use English anywhere in the response.`
   const prompt = base
     .replace('{tone}', TONE_INSTRUCTIONS[tone])
-    .replace('{transcript}', transcript.slice(0, TRANSCRIPT_LIMIT)) + languageInstruction
+    .replace('{transcript}', processedTranscript) + languageInstruction
 
   const response = await openai.chat.completions.create({
     model: 'llama-3.3-70b-versatile',

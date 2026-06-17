@@ -17,7 +17,6 @@ const navItems = [
   { href: "/new",         icon: PlusCircle,        label: "New Content"    },
   { href: "/reverse",     icon: Repeat2,           label: "Reverse"        },
   { href: "/history",     icon: History,           label: "History"        },
-  { href: "/calendar",    icon: CalendarDays,      label: "Calendar"       },
   { href: "/library",     icon: Star,              label: "Library"        },
   { href: "/feeds",       icon: Rss,               label: "RSS Feeds"      },
   { href: "/prompts",     icon: SlidersHorizontal, label: "Custom Prompts" },

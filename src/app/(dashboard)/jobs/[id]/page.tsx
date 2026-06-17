@@ -10,12 +10,15 @@ import type { Job, Output, Plan } from "@/types";
 import { UpgradeGate } from "@/components/UpgradeGate";
 
 const TABS = [
-  { type: "blog" as const,           icon: FileText,  label: "Blog Post"     },
-  { type: "twitter_thread" as const, icon: Hash,      label: "Twitter"       },
-  { type: "linkedin" as const,       icon: Briefcase, label: "LinkedIn"      },
-  { type: "newsletter" as const,     icon: Mail,      label: "Newsletter"    },
+  { type: "blog" as const,           icon: FileText,  label: "Blog Post"      },
+  { type: "twitter_thread" as const, icon: Hash,      label: "Twitter"        },
+  { type: "linkedin" as const,       icon: Briefcase, label: "LinkedIn"       },
+  { type: "newsletter" as const,     icon: Mail,      label: "Newsletter"     },
+  { type: "extras" as const,         icon: Layers,    label: "Hooks & Quotes" },
+];
+
+const SECONDARY_TABS = [
   { type: "email_sequence" as const, icon: AtSign,    label: "Email Sequence" },
-  { type: "extras" as const,         icon: Layers,    label: "Extras"        },
 ];
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
@@ -154,6 +157,20 @@ function QuickPublishBar({ tab, content }: Readonly<{ tab: Output["type"]; conte
         title="Copies post then opens LinkedIn"
       >
         <span className="font-bold text-[11px]">in</span> Open in LinkedIn
+      </a>
+    );
+  }
+  if (tab === "newsletter") {
+    return (
+      <a
+        href="https://app.substack.com/publish/post"
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => { void navigator.clipboard.writeText(content); }}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/40 hover:text-orange-400 text-xs transition-all hover:bg-white/5"
+        title="Copies newsletter then opens Substack"
+      >
+        <span className="font-bold text-[11px]">S</span> Open in Substack
       </a>
     );
   }
@@ -904,7 +921,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
       {job.status === "completed" && outputs.length > 0 && (
         <div>
           {/* Tabs */}
-          <div className="flex gap-1.5 mb-5 p-1 glass rounded-xl w-fit">
+          <div className="flex flex-wrap gap-1.5 mb-5 p-1 glass rounded-xl w-fit">
             {TABS.map((tab) => {
               const has    = outputs.some((o) => o.type === tab.type);
               const active = !showChat && activeTab === tab.type;
@@ -914,6 +931,21 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                   onClick={() => { setShowChat(false); switchTab(tab.type); }}
                   disabled={!has}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${getTabClass(active, has)}`}
+                >
+                  <tab.icon className="w-3.5 h-3.5" />
+                  {tab.label}
+                </button>
+              );
+            })}
+            {SECONDARY_TABS.map((tab) => {
+              const has    = outputs.some((o) => o.type === tab.type);
+              const active = !showChat && activeTab === tab.type;
+              if (!has) return null;
+              return (
+                <button
+                  key={tab.type}
+                  onClick={() => { setShowChat(false); switchTab(tab.type); }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all opacity-60 ${getTabClass(active, has)}`}
                 >
                   <tab.icon className="w-3.5 h-3.5" />
                   {tab.label}

@@ -43,8 +43,8 @@ const steps = [
   },
   {
     step: "02",
-    title: "GPT-4o reads your content",
-    desc: "We extract the transcript and run it through GPT-4o with your brand voice and tone settings baked in.",
+    title: "AI reads your content",
+    desc: "We extract the transcript and run it through our AI with your brand voice and tone settings baked in.",
   },
   {
     step: "03",
@@ -191,7 +191,7 @@ export default function LandingPage() {
         <div className="relative max-w-4xl mx-auto">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass text-sm text-amber-300 mb-8 border border-amber-500/20">
             <Star className="w-3 h-3 fill-current" />
-            Powered by GPT-4o — results in under 60 seconds
+            Powered by Groq — results in under 60 seconds
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold leading-tight mb-6">
