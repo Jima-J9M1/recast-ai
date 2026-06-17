@@ -5,11 +5,12 @@ import Link from "next/link";
 import {
   Zap, LayoutDashboard, PlusCircle, History, LogOut, TrendingUp,
   SlidersHorizontal, Settings, Mic2, Rss, CreditCard, Repeat2,
-  CalendarDays, Star, Users, Menu, X,
+  CalendarDays, Star, Users, Menu, X, Gift,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { ToastProvider } from "@/components/Toast";
+import { ChangelogWidget } from "@/components/ChangelogWidget";
 
 const navItems = [
   { href: "/dashboard",   icon: LayoutDashboard,  label: "Dashboard"      },
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/prompts",     icon: SlidersHorizontal, label: "Custom Prompts" },
   { href: "/brand-voice", icon: Mic2,              label: "Brand Voice"    },
   { href: "/team",        icon: Users,             label: "Team"           },
+  { href: "/invite",      icon: Gift,              label: "Invite & Earn"  },
   { href: "/billing",     icon: CreditCard,        label: "Billing"        },
   { href: "/settings",    icon: Settings,          label: "Settings"       },
 ];
@@ -139,6 +141,7 @@ function SidebarContent({
           </div>
         </div>
 
+        <ChangelogWidget />
         <button
           onClick={() => void logout()}
           className="flex items-center gap-2 px-3 py-2 text-xs text-white/30 hover:text-white/70 transition-colors w-full rounded-xl hover:bg-white/5"

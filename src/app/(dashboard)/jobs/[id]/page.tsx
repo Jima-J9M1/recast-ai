@@ -127,6 +127,38 @@ function LinkedInCharCount({ content }: Readonly<{ content: string }>) {
   );
 }
 
+function QuickPublishBar({ tab, content }: Readonly<{ tab: Output["type"]; content: string }>) {
+  if (tab === "twitter_thread") {
+    const firstTweet = content.split(/\n\n/)[0]?.replace(/^1\/\s*/, "").trim() ?? "";
+    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(firstTweet.slice(0, 270))}`;
+    return (
+      <a
+        href={tweetUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/40 hover:text-sky-400 text-xs transition-all hover:bg-white/5 hover:border-sky-500/20"
+      >
+        <span className="font-bold text-[11px]">𝕏</span> Tweet first hook
+      </a>
+    );
+  }
+  if (tab === "linkedin") {
+    return (
+      <a
+        href="https://www.linkedin.com/post/new"
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => { void navigator.clipboard.writeText(content); }}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-white/40 hover:text-blue-400 text-xs transition-all hover:bg-white/5"
+        title="Copies post then opens LinkedIn"
+      >
+        <span className="font-bold text-[11px]">in</span> Open in LinkedIn
+      </a>
+    );
+  }
+  return null;
+}
+
 function parseTweets(content: string): string[] {
   const blocks = content.split(/\n\n+/).map((b) => b.trim()).filter(Boolean);
   const numbered = blocks.filter((b) => /^\d+\//.test(b));
@@ -895,6 +927,9 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                     </button>
                   )}
                   <ShareButton jobId={id} />
+                  {previewContent === null && !editMode && (
+                    <QuickPublishBar tab={activeTab} content={activeOutput.content} />
+                  )}
                   {previewContent === null && (
                     <StarButton outputId={activeOutput.id} starred={starredIds.has(activeOutput.id)} onToggle={(id, starred) => setStarredIds((prev) => { const next = new Set(prev); starred ? next.add(id) : next.delete(id); return next; })} />
                   )}
