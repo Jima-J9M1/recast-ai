@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Sparkles } from "lucide-react";
 
 const CHANGELOG = [
@@ -17,10 +17,11 @@ const STORAGE_KEY = "recastai_changelog_seen_v1";
 
 export function ChangelogWidget() {
   const [open, setOpen] = useState(false);
-  const [seen, setSeen] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return localStorage.getItem(STORAGE_KEY) === "true";
-  });
+  const [seen, setSeen] = useState(true);
+
+  useEffect(() => {
+    setSeen(localStorage.getItem(STORAGE_KEY) === "true");
+  }, []);
 
   function dismiss() {
     localStorage.setItem(STORAGE_KEY, "true");
