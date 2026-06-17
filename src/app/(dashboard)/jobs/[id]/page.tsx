@@ -1,12 +1,13 @@
 "use client";
 
 import { use, useEffect, useState, useCallback, useRef } from "react";
-import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw, Save, MessageSquare, SendHorizonal, Star, AtSign, Pencil, Link2 } from "lucide-react";
+import { FileText, Hash, Briefcase, Mail, Copy, Check, ArrowLeft, Loader2, Square, Download, RefreshCw, Sparkles, X, Layers, History, RotateCcw, Save, MessageSquare, SendHorizonal, Star, AtSign, Pencil, Link2, ScrollText, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { createClient } from "@/lib/supabase/client";
-import type { Job, Output } from "@/types";
+import type { Job, Output, Plan } from "@/types";
+import { UpgradeGate } from "@/components/UpgradeGate";
 
 const TABS = [
   { type: "blog" as const,           icon: FileText,  label: "Blog Post"     },
@@ -191,6 +192,82 @@ function TwitterThreadView({ content }: Readonly<{ content: string }>) {
   );
 }
 
+
+function extractSeoTitle(md: string, fallback: string | null): string {
+  const match = /^#\s+(.+)$/m.exec(md);
+  const raw = match ? match[1].trim() : (fallback ?? "");
+  return raw.slice(0, 60);
+}
+
+function extractSeoDescription(md: string): string {
+  const lines = md.split(/\r?\n/);
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t || t.startsWith("#") || t.startsWith("**SEO") || t.startsWith("**Meta")) continue;
+    const plain = t
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\*(.+?)\*/g, "$1")
+      .replace(/\[(.+?)\]\(.+?\)/g, "$1")
+      .replace(/`(.+?)`/g, "$1");
+    if (plain.length > 40) return plain.slice(0, 155);
+  }
+  return "";
+}
+
+function toSlug(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-");
+}
+
+function extractKeyword(title: string): string {
+  return title.toLowerCase().split(/\s+/).slice(0, 3).join(" ");
+}
+
+function SeoMetaPanel({ content, jobTitle }: Readonly<{ content: string; jobTitle: string | null }>) {
+  const [seoOpen, setSeoOpen] = useState(false);
+  if (!content.trim()) return null;
+  const seoTitle = extractSeoTitle(content, jobTitle);
+  const seoDesc  = extractSeoDescription(content);
+  const seoSlug  = toSlug(seoTitle || jobTitle || "");
+  const seoKw    = extractKeyword(seoTitle || jobTitle || "");
+  const fields = [
+    { label: "Meta title",       value: seoTitle, max: 60  },
+    { label: "Meta description", value: seoDesc,  max: 155 },
+    { label: "URL slug",         value: seoSlug,  max: null },
+    { label: "Focus keyword",    value: seoKw,    max: null },
+  ];
+  return (
+    <div className="mt-6 rounded-xl border border-white/8 overflow-hidden">
+      <button
+        onClick={() => setSeoOpen((v) => !v)}
+        className="flex items-center justify-between w-full px-4 py-3 text-left hover:bg-white/3 transition-colors"
+      >
+        <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">SEO Metadata</span>
+        {seoOpen ? <ChevronUp className="w-3.5 h-3.5 text-white/30" /> : <ChevronDown className="w-3.5 h-3.5 text-white/30" />}
+      </button>
+      {seoOpen && (
+        <div className="border-t border-white/6 divide-y divide-white/5">
+          {fields.map(({ label, value, max }) => (
+            <div key={label} className="flex items-start gap-3 px-4 py-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-white/30 mb-1">{label}</p>
+                <p className="text-sm text-white/70 font-mono leading-relaxed break-all">{value || "—"}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 mt-1">
+                {max !== null && (
+                  <span className={`text-xs tabular-nums ${value.length > max ? "text-red-400" : "text-white/25"}`}>
+                    {value.length}/{max}
+                  </span>
+                )}
+                {value && <CopyButton text={value} />}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function parseSeoMeta(content: string): { keyword: string; metaDesc: string } | null {
   const kwMatch   = /^\*\*SEO keyword:\*\*\s*(.+)/m.exec(content);
   const metaMatch = /^\*\*Meta description:\*\*\s*(.+)/m.exec(content);
@@ -200,7 +277,8 @@ function parseSeoMeta(content: string): { keyword: string; metaDesc: string } | 
 
 function DownloadButton({ text, filename }: Readonly<{ text: string; filename: string }>) {
   function download() {
-    const blob = new Blob([text], { type: "text/markdown" });
+    const mime = filename.endsWith(".md") ? "text/markdown" : "text/plain";
+    const blob = new Blob([text], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = filename; a.click();
@@ -449,7 +527,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   const { id } = use(params);
   const [job, setJob]           = useState<Job | null>(null);
   const [outputs, setOutputs]   = useState<Output[]>([]);
-  const [activeTab, setActiveTab] = useState<Output["type"]>("blog");
+  const [activeTab, setActiveTab] = useState<Output["type"] | "transcript">("blog");
   const [viewingVersions, setViewingVersions] = useState<Partial<Record<string, number>>>({});
   const [loading, setLoading]   = useState(true);
   const [stopping, setStopping] = useState(false);
@@ -466,6 +544,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   const [showChat, setShowChat]             = useState(false);
   const [starredIds, setStarredIds]         = useState<Set<string>>(new Set());
   const [outputLoadError, setOutputLoadError] = useState(false);
+  const [userPlan, setUserPlan] = useState<Plan>("free");
   const loadingRef  = useRef(false);
   const loadedRef   = useRef(false);
   const failCountRef = useRef(0);
@@ -508,6 +587,11 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
         setJob(data);
         if (data.status === "completed") await loadOutputs(id);
       }
+      const authRes = await supabase.auth.getUser();
+      if (authRes.data.user) {
+        const { data: ud } = await supabase.from("users").select("plan").eq("id", authRes.data.user.id).single();
+        if (ud) setUserPlan(ud.plan as Plan);
+      }
       setLoading(false);
     }
     init();
@@ -532,7 +616,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   const currentVersion = viewingVersions[activeTab] ?? latestVersion;
   const activeOutput = tabVersions.find((o) => o.version === currentVersion) ?? tabVersions[0];
 
-  function switchTab(tab: Output["type"]) {
+  function switchTab(tab: Output["type"] | "transcript") {
     setActiveTab(tab);
     setEditMode(false);
     setRefineOpen(false);
@@ -546,6 +630,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   }
 
   const handlePreviewRefine = useCallback(async (instruction: string) => {
+    if (activeTab === "transcript") return;
     setPreviewing(true);
     setRefineOpen(false);
     try {
@@ -577,7 +662,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
         const newOutput: Output = {
           id: crypto.randomUUID(),
           job_id: id,
-          type: activeTab,
+          type: activeTab as import("@/types").OutputType,
           content: previewContent,
           version,
           created_at: new Date().toISOString(),
@@ -593,6 +678,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
   }, [id, activeTab, previewContent]);
 
   const handleRegenerate = useCallback(async () => {
+    if (activeTab === "transcript") return;
     setRegenerating(true);
     setPreviewContent(null);
     try {
@@ -606,7 +692,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
         const newOutput: Output = {
           id: crypto.randomUUID(),
           job_id: id,
-          type: activeTab,
+          type: activeTab as import("@/types").OutputType,
           content,
           version,
           created_at: new Date().toISOString(),
@@ -632,7 +718,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
         const newOutput: Output = {
           id: crypto.randomUUID(),
           job_id: id,
-          type: activeTab,
+          type: activeTab as import("@/types").OutputType,
           content,
           version: newVersion,
           created_at: new Date().toISOString(),
@@ -836,6 +922,18 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
             })}
             {job.transcript && (
               <button
+                onClick={() => { setShowChat(false); switchTab("transcript"); }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  !showChat && activeTab === "transcript"
+                    ? "bg-amber-600 text-white shadow-lg shadow-amber-900/40"
+                    : "text-white/50 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <ScrollText className="w-3.5 h-3.5" /> Transcript
+              </button>
+            )}
+            {job.transcript && (
+              <button
                 onClick={() => setShowChat(true)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   showChat
@@ -851,8 +949,23 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
           {/* Chat panel */}
           {showChat && <ChatPanel jobId={id} />}
 
+          {/* Transcript panel */}
+          {!showChat && activeTab === "transcript" && job.transcript && (
+            <div className="glass rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/5">
+                <span className="text-xs text-white/30">{job.transcript.trim().split(/\s+/).filter(Boolean).length.toLocaleString()} words</span>
+                <CopyButton text={job.transcript} />
+              </div>
+              <div className="p-7">
+                <UpgradeGate userPlan={userPlan} required="starter" feature="Transcript">
+                  <pre className="text-sm text-white/70 whitespace-pre-wrap leading-relaxed font-mono max-h-[65vh] overflow-auto">{job.transcript}</pre>
+                </UpgradeGate>
+              </div>
+            </div>
+          )}
+
           {/* Content card */}
-          {!showChat && activeOutput && (
+          {!showChat && activeTab !== "transcript" && activeOutput && (
             <div className="glass rounded-2xl overflow-hidden">
               <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/5">
                 <div className="flex items-center gap-3">
@@ -917,7 +1030,12 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                   {activeTab !== "twitter_thread" && (
                     <CopyMarkdownButton text={previewContent ?? activeOutput.content} />
                   )}
-                  <DownloadButton text={previewContent ?? activeOutput.content} filename={`${activeTab}-${id.slice(0, 8)}.md`} />
+                  <UpgradeGate compact userPlan={userPlan} required="starter" feature="Download">
+                    <DownloadButton
+                      text={previewContent ?? activeOutput.content}
+                      filename={`recastai-${activeTab}-${id.slice(0, 8)}.${activeTab === "blog" ? "md" : "txt"}`}
+                    />
+                  </UpgradeGate>
                   {previewContent === null && !editMode && (
                     <button
                       onClick={() => { setEditedContent(activeOutput.content); setEditMode(true); }}
@@ -984,6 +1102,11 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                     </div>
                   ) : null;
                 })()}
+                {activeTab === "blog" && !editMode && activeOutput && (
+                  <UpgradeGate userPlan={userPlan} required="starter" feature="SEO Metadata">
+                    <SeoMetaPanel content={previewContent ?? activeOutput.content} jobTitle={job.title} />
+                  </UpgradeGate>
+                )}
                 {editMode ? (
                   <div className="flex flex-col gap-3">
                     <textarea
@@ -1008,7 +1131,7 @@ export default function JobPage({ params }: Readonly<{ params: Promise<{ id: str
                               const newOutput: Output = {
                                 id: crypto.randomUUID(),
                                 job_id: id,
-                                type: activeTab,
+                                type: activeTab as import("@/types").OutputType,
                                 content: editedContent,
                                 version,
                                 created_at: new Date().toISOString(),
