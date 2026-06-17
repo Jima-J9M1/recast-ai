@@ -172,7 +172,8 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
       if (data) {
         setProfile(data);
         const planLimits: Record<string, number | null> = { free: 3, starter: 25, pro: null };
-        const limit = planLimits[data.plan as string] ?? 3;
+        const rawLimit = planLimits[data.plan as string];
+        const limit = rawLimit !== undefined ? rawLimit : 3;
         if (limit !== null) {
           const startOfMonth = new Date();
           startOfMonth.setDate(1);
