@@ -1,5 +1,21 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment variables
+
+Copy `.env.example` to `.env.local` for local development, then fill in the values for Supabase, Groq, and Polar.sh:
+
+```bash
+cp .env.example .env.local
+```
+
+For Vercel deployments, add the same keys from `.env.example` in **Project Settings → Environment Variables**. Set `NEXT_PUBLIC_APP_URL` to your production Vercel domain, for example `https://your-project.vercel.app`, so auth redirects and Polar checkout success URLs point back to production.
+
+After deployment, configure the Polar.sh webhook endpoint to:
+
+```text
+https://your-project.vercel.app/api/webhooks/polar
+```
+
 ## Getting Started
 
 First, run the development server:
